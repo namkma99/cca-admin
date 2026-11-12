@@ -23,7 +23,7 @@ export default async function AdminUsersPage() {
       <div>
         <h1 className="text-3xl font-semibold">Người dùng</h1>
         <p className="mt-2 text-muted-foreground">
-          Tạo tài khoản học viên, khóa/mở khóa và cấp lại mật khẩu tạm.
+          Tạo tài khoản học viên, quản lý danh sách và khóa/mở khóa tài khoản.
         </p>
       </div>
       <UsersPanel initialUsers={initialUsers} />
