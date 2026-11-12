@@ -17,8 +17,8 @@ import { users } from '../../src/server/db/schema';
 let fixture: Awaited<ReturnType<typeof createTestDatabase>>;
 let handlers: ReturnType<typeof createAuthHandlers>;
 let verifier: string;
-const origin = 'https://admin.example.com';
-const frontend = 'https://learn.example.com';
+const origin = 'https://cca.dev-pro.online';
+const frontend = 'https://dev-pro.online';
 const password = 'temporary-secret-123';
 const config = readAuthConfig({
   NODE_ENV: 'production',
@@ -113,6 +113,60 @@ describe('auth HTTP boundary', () => {
     );
     expect((await after.json()).session).toBeNull();
     expect((await handlers.logout(request('logout', {}))).status).toBe(200);
+  });
+  it('supports the cross-origin frontend through login, setup, session and logout', async () => {
+    const assertCors = (response: Response) => {
+      expect(response.headers.get('access-control-allow-origin')).toBe(
+        frontend,
+      );
+      expect(response.headers.get('access-control-allow-credentials')).toBe(
+        'true',
+      );
+      expect(response.headers.get('vary')).toContain('Origin');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    };
+    const first = await handlers.login(
+      request('login', { username: 'admin', password }, { Origin: frontend }),
+    );
+    expect(first.status).toBe(200);
+    assertCors(first);
+    expect(first.headers.get('set-cookie')).toContain('SameSite=Lax');
+    const setup = await handlers.setupPassword(
+      request(
+        'setup-password',
+        {
+          password: 'permanent-secret-123',
+          confirmPassword: 'permanent-secret-123',
+        },
+        { Origin: frontend, Cookie: cookie(first) },
+      ),
+    );
+    expect(setup.status).toBe(200);
+    assertCors(setup);
+    expect(setup.headers.get('set-cookie')).toContain('SameSite=Lax');
+    const current = await handlers.session(
+      request('session', undefined, {
+        Origin: frontend,
+        Cookie: cookie(setup),
+      }),
+    );
+    assertCors(current);
+    expect((await current.json()).session.kind).toBe('authenticated');
+    const logout = await handlers.logout(
+      request('logout', {}, { Origin: frontend, Cookie: cookie(setup) }),
+    );
+    expect(logout.status).toBe(200);
+    assertCors(logout);
+    expect(logout.headers.get('set-cookie')).toContain('SameSite=Lax');
+    expect(logout.headers.get('set-cookie')).toContain('Secure');
+    expect(logout.headers.get('set-cookie')).toContain('Max-Age=0');
+    const after = await handlers.session(
+      request('session', undefined, {
+        Origin: frontend,
+        Cookie: cookie(setup),
+      }),
+    );
+    expect((await after.json()).session).toBeNull();
   });
   it('blocks untrusted/missing/null origins for mutations before accessing DB', async () => {
     for (const badOrigin of ['https://evil.example', 'null']) {

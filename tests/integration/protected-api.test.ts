@@ -81,3 +81,57 @@ it('rejects untrusted mutations and allows exact credential preflight without au
   expect(pre.status).toBe(204);
   expect(pre.headers.get('access-control-allow-credentials')).toBe('true');
 });
+
+it('allows production frontend preflight and credentialed exam requests, and rejects lookalike origins', async () => {
+  const api = 'https://cca.dev-pro.online';
+  const frontend = 'https://dev-pro.online';
+  const productionHandler = createProtectedHandler({
+    config: readAuthConfig({ NODE_ENV: 'production', APP_ORIGIN: api }),
+    runWithDatabase: async (work) => work(fixture.db),
+  });
+  const preflight = await productionHandler(
+    new Request(`${api}/api/v1/exams/attempts/test/answers`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: frontend,
+        'Access-Control-Request-Method': 'PUT',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    }),
+    async () => ({}),
+  );
+  expect(preflight.status).toBe(204);
+  expect(preflight.headers.get('access-control-allow-origin')).toBe(frontend);
+  expect(preflight.headers.get('access-control-allow-credentials')).toBe(
+    'true',
+  );
+  expect(preflight.headers.get('access-control-allow-methods')).toContain(
+    'PUT',
+  );
+  const response = await productionHandler(
+    new Request(`${api}/api/v1/exams/dashboard`, {
+      headers: {
+        Origin: frontend,
+        Cookie: studentCookie.replace('cca_session=', '__Host-cca_session='),
+      },
+    }),
+    async () => ({ ok: true }),
+  );
+  expect(response.status).toBe(200);
+  expect(response.headers.get('access-control-allow-origin')).toBe(frontend);
+  expect(response.headers.get('access-control-allow-credentials')).toBe('true');
+  for (const origin of [
+    'https://dev-pro.online.evil.invalid',
+    'https://devpro.online',
+    'http://dev-pro.online',
+  ]) {
+    const rejected = await productionHandler(
+      new Request(`${api}/api/v1/exams/dashboard`, {
+        headers: { Origin: origin },
+      }),
+      async () => ({}),
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.headers.get('access-control-allow-origin')).toBeNull();
+  }
+});

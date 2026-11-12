@@ -27,3 +27,16 @@ it('only trusts client IP headers on Vercel', () => {
   expect(clientIp(req, false)).toBe('local');
   expect(clientIp(req, true)).toBe('5.6.7.8');
 });
+
+it('allows the production frontend by default but honors an explicit allowlist', () => {
+  const env = {
+    NODE_ENV: 'production',
+    APP_ORIGIN: 'https://cca.dev-pro.online',
+  };
+  expect(readAuthConfig(env).allowedOrigins.has('https://dev-pro.online')).toBe(
+    true,
+  );
+  const restricted = readAuthConfig({ ...env, CCA_ALLOWED_ORIGINS: '' });
+  expect(restricted.allowedOrigins.has('https://dev-pro.online')).toBe(false);
+  expect(restricted.allowedOrigins.has(env.APP_ORIGIN)).toBe(true);
+});

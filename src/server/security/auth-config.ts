@@ -15,7 +15,8 @@ export function readAuthConfig(
   const appOrigin = env.APP_ORIGIN ?? (secure ? '' : 'http://localhost:3000');
   const configured = [
     appOrigin,
-    ...(env.CCA_ALLOWED_ORIGINS?.split(',')
+    ...((env.CCA_ALLOWED_ORIGINS ?? (secure ? 'https://dev-pro.online' : ''))
+      .split(',')
       .map((v) => v.trim())
       .filter(Boolean) ?? []),
   ];

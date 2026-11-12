@@ -13,7 +13,18 @@ Sao chép .env.example thành .env.local; không commit credentials.
 | CCA_ALLOWED_ORIGINS | Danh sách origin CCA được phép, phân cách dấu phẩy; để trống khi chưa kết nối frontend ngoài |
 | CRON_SECRET         | Dự phòng cho cleanup sau này; chưa có endpoint Cron hoạt động                                |
 
-Development mặc định APP_ORIGIN=http://localhost:3000 nếu không khai báo. Nếu đổi port phải đổi APP_ORIGIN. Production yêu cầu APP_ORIGIN HTTPS rõ ràng; origin thiếu/sai khiến auth API trả lỗi cấu hình an toàn. Preview cần APP_ORIGIN của đúng preview và database riêng; không tự tin giá trị Host do client gửi.
+Development mặc định APP_ORIGIN=http://localhost:3000 nếu không khai báo; `.env.example` cũng dùng port 3000. `npm run dev` chạy port 3001 nên cần đặt `APP_ORIGIN=http://localhost:3001` trong `.env.local`. Nếu đổi port phải đổi APP_ORIGIN. Production yêu cầu APP_ORIGIN HTTPS rõ ràng; origin thiếu/sai khiến auth API trả lỗi cấu hình an toàn. Preview cần APP_ORIGIN của đúng preview và database riêng; không tự tin giá trị Host do client gửi.
+
+Production hiện dùng:
+
+```dotenv
+APP_ORIGIN=https://cca.dev-pro.online
+CCA_ALLOWED_ORIGINS=https://dev-pro.online
+```
+
+Khai báo hai giá trị này trong môi trường triển khai rồi redeploy. Khi không khai báo `CCA_ALLOWED_ORIGINS`, production mặc định cho phép đúng `https://dev-pro.online`; giá trị khai báo rõ (kể cả chuỗi rỗng) thay thế mặc định. `APP_ORIGIN` production vẫn bắt buộc là origin HTTPS hợp lệ. Không thay `.env.local` development bằng cấu hình production.
+
+Frontend `https://dev-pro.online` và API `https://cca.dev-pro.online` khác origin nhưng cùng site. Cookie host-only trên API với `SameSite=Lax; Secure; HttpOnly; Path=/` hoạt động cho fetch cùng site khi frontend dùng `credentials: include`. Không cần `Domain=.dev-pro.online` hoặc `SameSite=None`. CORS phải cho phép chính xác origin frontend và credentials; request OPTIONS không yêu cầu phiên.
 
 Cookie production là __Host-cca_session, HttpOnly, Secure, SameSite=Lax, Path=/ và không có Domain. Development dùng cca_session không Secure để chạy HTTP local. CCA và API production cần HTTPS cùng site/domain gốc để cookie này làm việc; allowlist CORS không vượt qua chính sách cookie bên thứ ba của browser.
 
