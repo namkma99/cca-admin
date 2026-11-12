@@ -10,7 +10,7 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
 }
 export const userIdInput = (id: string) => parseInput(z.uuid(), id);
 export const startInput = z
-  .object({ topicId: topicSchema, formNumber: z.number().int().min(1).max(10) })
+  .object({ topicId: topicSchema, formNumber: z.number().int().min(1).max(50) })
   .strict();
 export const answerInput = z
   .object({

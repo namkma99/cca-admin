@@ -1,9 +1,7 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { adminAuditLogs, authSessions, users } from '@/server/db/schema';
-import { hashPassword } from '@/server/security/password';
 import {
   hashSessionToken,
   SESSION_TOKEN_PATTERN,
@@ -170,8 +168,6 @@ export class UserService {
     if (!parsed.success)
       throw fail('INVALID_INPUT', 400, 'Username không hợp lệ.');
     const username = parsed.data.username;
-    const temporaryPassword = randomBytes(24).toString('base64url');
-    const passwordHash = await hashPassword(temporaryPassword);
     return this.db.transaction(async (tx) => {
       await this.serializeAdminMutation(tx);
       const actor = await this.actor(tx, token);
@@ -180,7 +176,7 @@ export class UserService {
           .insert(users)
           .values({
             username,
-            passwordHash,
+            passwordHash: null,
             role: 'student',
             status: 'pending_password',
           })
@@ -192,7 +188,7 @@ export class UserService {
           action: 'create_user',
           metadata: { username },
         });
-        return { user: safeUser(user), temporaryPassword };
+        return { user: safeUser(user) };
       } catch (error) {
         let cause: unknown = error;
         while (cause && typeof cause === 'object' && 'cause' in cause)
@@ -295,8 +291,6 @@ export class UserService {
   }
 
   async resetPassword(token: string | null, id: string) {
-    const temporaryPassword = randomBytes(24).toString('base64url');
-    const passwordHash = await hashPassword(temporaryPassword);
     return this.db.transaction(async (tx) => {
       await this.serializeAdminMutation(tx);
       const actor = await this.actor(tx, token);
@@ -322,7 +316,7 @@ export class UserService {
       await finalizeActiveForUser(tx, id, now);
       await tx
         .update(users)
-        .set({ passwordHash, status: 'pending_password', updatedAt: now })
+        .set({ passwordHash: null, status: 'pending_password', updatedAt: now })
         .where(eq(users.id, id));
       await tx
         .update(authSessions)
@@ -338,7 +332,7 @@ export class UserService {
         action: 'reset_password',
         metadata: { from: target.status, to: 'pending_password' },
       });
-      return { user: safeUser(updated), temporaryPassword };
+      return { user: safeUser(updated) };
     });
   }
 

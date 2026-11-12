@@ -26,8 +26,16 @@ beforeEach(async () => {
     { username: 'pending', passwordHash: hash },
   ]);
   const auth = new AuthService(fixture.db);
-  studentCookie = `cca_session=${(await auth.login({ username: 'student', password }, 'test')).token}`;
-  setupCookie = `cca_session=${(await auth.login({ username: 'pending', password }, 'test')).token}`;
+  const studentLogin = await auth.login(
+    { username: 'student', password },
+    'test',
+  );
+  const setupLogin = await auth.login(
+    { username: 'pending', password },
+    'test',
+  );
+  studentCookie = `cca_session=${'token' in studentLogin ? studentLogin.token : ''}`;
+  setupCookie = `cca_session=${'token' in setupLogin ? setupLogin.token : ''}`;
   handler = createProtectedHandler({
     config: readAuthConfig({ NODE_ENV: 'test', APP_ORIGIN: origin }),
     runWithDatabase: async (work) => work(fixture.db),

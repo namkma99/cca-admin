@@ -14,7 +14,7 @@ export const users = pgTable(
   {
     id: uuid('id').defaultRandom().primaryKey(),
     username: varchar('username', { length: 64 }).notNull().unique(),
-    passwordHash: text('password_hash').notNull(),
+    passwordHash: text('password_hash'),
     role: text('role', { enum: ['admin', 'student'] })
       .default('student')
       .notNull(),

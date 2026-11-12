@@ -13,7 +13,7 @@ export const usernameSchema = z
 export const loginSchema = z
   .object({
     username: usernameSchema,
-    password: z.string().min(1).max(128),
+    password: z.string().min(1).max(128).optional(),
   })
   .strict();
 export const setupPasswordSchema = z
@@ -45,3 +45,14 @@ export const authSessionSchema = z
 export const sessionResponseSchema = z
   .object({ session: authSessionSchema.nullable() })
   .strict();
+
+export const loginResponseSchema = z.union([
+  z.object({
+    session: authSessionSchema,
+  }),
+  z.object({
+    needPassword: z.literal(true),
+    username: z.string(),
+  }),
+]);
+export type LoginResponse = z.infer<typeof loginResponseSchema>;

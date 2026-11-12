@@ -37,21 +37,52 @@ describe('auth forms', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), ' Admin ');
-    await user.type(screen.getByLabelText('Mật khẩu'), 'temporary-password');
-    await user.click(screen.getByRole('button', { name: 'Hiện mật khẩu' }));
-    expect(screen.getByLabelText('Mật khẩu')).toHaveAttribute('type', 'text');
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
     await waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith('/setup-password'),
     );
     const [, init] = fetcher.mock.calls[0]!;
     expect(JSON.parse(init.body)).toEqual({
       username: 'admin',
-      password: 'temporary-password',
     });
     expect(init.credentials).toBe('include');
     expect(localWrite).not.toHaveBeenCalled();
     expect(sessionWrite).not.toHaveBeenCalled();
+  });
+
+  it('identifies active user and requires password in step 2', async () => {
+    const user = userEvent.setup();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          needPassword: true,
+          username: 'admin',
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          session: {
+            kind: 'authenticated',
+            expiresAt: '2026-11-13T12:00:00.000Z',
+            user: {
+              id: '00000000-0000-4000-8000-000000000001',
+              username: 'admin',
+              role: 'admin',
+            },
+          },
+        }),
+      );
+    vi.stubGlobal('fetch', fetcher);
+    render(<AuthForm mode="login" />);
+    await user.type(screen.getByLabelText('Username'), 'admin');
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+    expect(await screen.findByLabelText('Mật khẩu')).toBeVisible();
+    await user.type(screen.getByLabelText('Mật khẩu'), 'correct-password');
+    await user.click(screen.getByRole('button', { name: 'Hiện mật khẩu' }));
+    expect(screen.getByLabelText('Mật khẩu')).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/admin'));
   });
 
   it('shows generic server errors and re-enables submit after failure', async () => {
@@ -72,12 +103,11 @@ describe('auth forms', () => {
     );
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), 'admin');
-    await user.type(screen.getByLabelText('Mật khẩu'), 'wrong');
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Username hoặc mật khẩu không chính xác.',
     );
-    expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Tiếp tục' })).toBeEnabled();
   });
 
   it('prevents mismatched setup passwords from reaching the API', async () => {
@@ -148,17 +178,16 @@ describe('auth forms', () => {
     );
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), 'admin');
-    await user.type(screen.getByLabelText('Mật khẩu'), 'temporary-password');
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
     expect(
-      await screen.findByRole('button', { name: 'Đang đăng nhập…' }),
+      await screen.findByRole('button', { name: 'Đang kiểm tra…' }),
     ).toBeDisabled();
     fail(new Error('Network unavailable'));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Network unavailable',
     );
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeEnabled(),
+      expect(screen.getByRole('button', { name: 'Tiếp tục' })).toBeEnabled(),
     );
     expect(router.replace).not.toHaveBeenCalled();
   });

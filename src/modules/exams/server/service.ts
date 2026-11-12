@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { calculateBankVersion } from '@/modules/question-bank/server/bank-version';
 import {
@@ -8,6 +8,7 @@ import {
   examAttempts,
   examCycles,
   questions,
+  settings,
   users,
 } from '@/server/db/schema';
 import { AppError } from '@/server/http/errors';
@@ -27,7 +28,6 @@ import type {
 
 export const EXAM_DURATION_MINUTES = 120;
 export const FORM_COUNT = 10;
-const DURATION_MS = EXAM_DURATION_MINUTES * 60 * 1000;
 const GENERATOR_VERSION = 'exam-generator-v1';
 const TOPICS = [
   { id: 'cca-f' as const, title: 'CCA-F', questionsPerExam: 60 },
@@ -272,8 +272,33 @@ export class ExamService {
       .where(eq(examAttemptPayloads.attemptId, a.id));
     return out ?? a;
   }
+  private async getExamSettings(tx?: Tx): Promise<{
+    durationMinutes: number;
+    formCount: number;
+  }> {
+    const database = tx ?? this.db;
+    try {
+      const rows = await database
+        .select()
+        .from(settings)
+        .where(inArray(settings.key, ['exam_duration_minutes', 'form_count']));
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      const duration =
+        typeof map.get('exam_duration_minutes') === 'number'
+          ? (map.get('exam_duration_minutes') as number)
+          : EXAM_DURATION_MINUTES;
+      const formCount =
+        typeof map.get('form_count') === 'number'
+          ? (map.get('form_count') as number)
+          : FORM_COUNT;
+      return { durationMinutes: duration, formCount };
+    } catch {
+      return { durationMinutes: EXAM_DURATION_MINUTES, formCount: FORM_COUNT };
+    }
+  }
   async catalog(token: string | null): Promise<Catalog> {
     const u = await this.auth(token);
+    const { durationMinutes, formCount } = await this.getExamSettings();
     const used = await this.db
       .select({ topic: examCycles.topicCode, form: examAttempts.formNumber })
       .from(examAttempts)
@@ -290,13 +315,14 @@ export class ExamService {
           questionCount: 0,
           excludedCount: 0,
           questionsPerExam: t.questionsPerExam,
-          durationMinutes: EXAM_DURATION_MINUTES,
-          formCount: FORM_COUNT,
-          forms: FORM_COUNT,
+          durationMinutes,
+          formCount,
+          forms: formCount,
           usedForms: forms,
-          availableForms: Array.from({ length: 10 }, (_, i) => i + 1).filter(
-            (x) => !forms.includes(x),
-          ),
+          availableForms: Array.from(
+            { length: formCount },
+            (_, i) => i + 1,
+          ).filter((x) => !forms.includes(x)),
         };
       }),
     };
@@ -337,17 +363,19 @@ export class ExamService {
     input: { topicId: TopicId; formNumber: number },
   ): Promise<Attempt> {
     await this.auth(token);
+    const { durationMinutes, formCount } = await this.getExamSettings();
+    const durationMs = durationMinutes * 60 * 1000;
     if (
       !TOPICS.some((t) => t.id === input?.topicId) ||
       !Number.isInteger(input?.formNumber) ||
       input.formNumber < 1 ||
-      input.formNumber > 10
+      input.formNumber > formCount
     )
       fail('INVALID_INPUT', 400, 'Đề thi không hợp lệ.');
     const outcome = (await this.db.transaction(async (tx) => {
       const { u, s } = await this.lockUser(tx, token);
       const n = this.now();
-      if (s!.expiresAt.getTime() - n.getTime() < DURATION_MS)
+      if (s!.expiresAt.getTime() - n.getTime() < durationMs)
         fail(
           'SESSION_TOO_SHORT',
           409,
@@ -429,7 +457,7 @@ export class ExamService {
           input.formNumber,
           t.questionsPerExam,
         ),
-        expires = new Date(n.getTime() + DURATION_MS);
+        expires = new Date(n.getTime() + durationMs);
       const [a] = await tx
         .insert(examAttempts)
         .values({

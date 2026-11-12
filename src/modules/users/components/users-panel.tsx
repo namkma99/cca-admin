@@ -16,8 +16,8 @@ export function UsersPanel({ initialUsers = [] }: { initialUsers?: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [query, setQuery] = useState('');
   const [username, setUsername] = useState('');
-  const [temporary, setTemporary] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const load = async (value = query) => {
     const response = await fetch(
@@ -34,19 +34,22 @@ export function UsersPanel({ initialUsers = [] }: { initialUsers?: User[] }) {
   async function create(event: FormEvent) {
     event.preventDefault();
     setError('');
-    setTemporary('');
+    setSuccess('');
+    const createdUsername = username;
     const response = await fetch('/api/v1/admin/users', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username: createdUsername }),
     });
     const body = await response.json();
     if (!response.ok) {
       setError(body.error?.message ?? 'Không thể tạo tài khoản.');
       return;
     }
-    setTemporary(body.temporaryPassword);
+    setSuccess(
+      `Đã tạo học viên "${createdUsername}". Học viên sẽ tự đặt mật khẩu khi đăng nhập lần đầu.`,
+    );
     setUsername('');
     await load();
   }
@@ -69,12 +72,12 @@ export function UsersPanel({ initialUsers = [] }: { initialUsers?: User[] }) {
         <button className="rounded bg-primary px-4 py-2 text-primary-foreground">
           Tạo học viên
         </button>
-        {temporary && (
+        {success && (
           <p
             role="status"
-            className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-950"
+            className="rounded bg-green-100 px-3 py-2 text-sm text-green-950 dark:bg-green-950 dark:text-green-100"
           >
-            Mật khẩu tạm (chỉ hiện lần này): <code>{temporary}</code>
+            {success}
           </p>
         )}
       </form>
