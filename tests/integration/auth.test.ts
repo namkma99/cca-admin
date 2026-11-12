@@ -32,8 +32,14 @@ beforeEach(async () => {
     updatedAt: now,
   });
 });
-const login = () =>
-  service.login({ username: ' STUDENT ', password: temporary }, '127.0.0.1');
+const login = async () => {
+  const result = await service.login(
+    { username: ' STUDENT ', password: temporary },
+    '127.0.0.1',
+  );
+  if (!('token' in result)) throw new Error('Expected login session');
+  return result;
+};
 
 describe('auth on PostgreSQL', () => {
   it('grants only a ten-minute setup session after proving the temporary password', async () => {
@@ -109,14 +115,55 @@ describe('auth on PostgreSQL', () => {
     await expect(login()).rejects.toMatchObject({
       code: 'INVALID_CREDENTIALS',
     });
-    expect(
-      (
-        await service.login(
-          { username: 'student', password: permanent },
-          '127.0.0.1',
-        )
-      ).session.kind,
-    ).toBe('authenticated');
+    const authLogin = await service.login(
+      { username: 'student', password: permanent },
+      '127.0.0.1',
+    );
+    expect('token' in authLogin && authLogin.session.kind).toBe(
+      'authenticated',
+    );
+  });
+
+  it('supports 2-step login: grants setup session for pending user with only username, and requires password for active user', async () => {
+    await fixture.db.insert(users).values({
+      username: 'new_student',
+      passwordHash: null,
+      role: 'student',
+      status: 'pending_password',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const setupResult = await service.login(
+      { username: 'new_student' },
+      '127.0.0.1',
+    );
+    expect('token' in setupResult).toBe(true);
+    if ('token' in setupResult) {
+      expect(setupResult.session.kind).toBe('password_setup');
+      const active = await service.setupPassword(setupResult.token, {
+        password: permanent,
+        confirmPassword: permanent,
+      });
+      expect(active.session.kind).toBe('authenticated');
+    }
+
+    const step1Active = await service.login(
+      { username: 'new_student' },
+      '127.0.0.1',
+    );
+    expect(step1Active).toEqual({
+      needPassword: true,
+      username: 'new_student',
+    });
+
+    const step2Active = await service.login(
+      { username: 'new_student', password: permanent },
+      '127.0.0.1',
+    );
+    expect('token' in step2Active && step2Active.session.kind).toBe(
+      'authenticated',
+    );
   });
 
   it('checks database expiry at the exact boundary and does not refresh on reads', async () => {
@@ -256,7 +303,7 @@ describe('auth on PostgreSQL', () => {
       { username: admin.username, password: admin.temporaryPassword },
       '127.0.0.1',
     );
-    expect(issued.session.kind).toBe('password_setup');
+    expect('token' in issued && issued.session.kind).toBe('password_setup');
     await expect(createAdmin(fixture.db, 'new.admin')).rejects.toThrow();
     expect(
       (await fixture.db.select().from(users)).filter(

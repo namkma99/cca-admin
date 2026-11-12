@@ -6,11 +6,12 @@ import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import {
-  loginSchema,
   setupPasswordSchema,
   sessionResponseSchema,
+  loginResponseSchema,
   type LoginInput,
   type SetupPasswordInput,
+  type LoginResponse,
 } from '../contracts/schemas';
 import { authDestination } from '../contracts/navigation';
 
@@ -22,16 +23,21 @@ function PasswordField({
   label,
   id,
   registration,
+  value,
+  onChange,
   error,
   autoComplete,
 }: {
   label: string;
   id: string;
-  registration: UseFormRegisterReturn;
+  registration?: UseFormRegisterReturn;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error?: string;
   autoComplete: string;
 }) {
   const [visible, setVisible] = useState(false);
+  const inputProps = registration ? registration : { value, onChange };
   return (
     <div>
       <label htmlFor={id} className="text-sm font-medium">
@@ -39,7 +45,7 @@ function PasswordField({
       </label>
       <div className="relative">
         <input
-          {...registration}
+          {...inputProps}
           id={id}
           type={visible ? 'text' : 'password'}
           autoComplete={autoComplete}
@@ -70,8 +76,28 @@ function PasswordField({
   );
 }
 
-async function postAuth(path: string, input: LoginInput | SetupPasswordInput) {
-  const response = await fetch(`/api/v1/auth/${path}`, {
+async function postLogin(input: LoginInput): Promise<LoginResponse> {
+  const response = await fetch('/api/v1/auth/login', {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) {
+    const error = body as { error?: { message?: string } };
+    throw new Error(
+      typeof error.error?.message === 'string' ? error.error.message : fallback,
+    );
+  }
+  const parsed = loginResponseSchema.safeParse(body);
+  if (!parsed.success) throw new Error(fallback);
+  return parsed.data;
+}
+
+async function postSetup(input: SetupPasswordInput) {
+  const response = await fetch('/api/v1/auth/setup-password', {
     method: 'POST',
     credentials: 'include',
     cache: 'no-store',
@@ -89,6 +115,7 @@ async function postAuth(path: string, input: LoginInput | SetupPasswordInput) {
   if (!parsed.success || !parsed.data.session) throw new Error(fallback);
   return parsed.data.session;
 }
+
 function FormError({ children }: { children: ReactNode }) {
   return children ? (
     <p
@@ -102,25 +129,98 @@ function FormError({ children }: { children: ReactNode }) {
 
 function LoginForm() {
   const router = useRouter();
+  const [step, setStep] = useState<'username' | 'password'>('username');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
-  const submit = handleSubmit(async (input) => {
-    setError('');
-    try {
-      const session = await postAuth('login', input);
-      router.replace(authDestination(session));
-      router.refresh();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : fallback);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleUsernameSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername) {
+      setError('Vui lòng kiểm tra username.');
+      return;
     }
-  });
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const res = await postLogin({ username: cleanUsername });
+      if ('session' in res && res.session) {
+        router.replace(authDestination(res.session));
+        router.refresh();
+      } else if ('needPassword' in res && res.needPassword) {
+        setUsername(res.username);
+        setStep('password');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : fallback);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!password) {
+      setError('Vui lòng nhập mật khẩu.');
+      return;
+    }
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const res = await postLogin({ username, password });
+      if ('session' in res && res.session) {
+        router.replace(authDestination(res.session));
+        router.refresh();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : fallback);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (step === 'password') {
+    return (
+      <form
+        onSubmit={handlePasswordSubmit}
+        noValidate
+        className="space-y-5"
+        aria-busy={isSubmitting}
+      >
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3 text-sm">
+          <span className="font-medium text-foreground">{username}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setStep('username');
+              setPassword('');
+              setError('');
+            }}
+            className="text-xs font-semibold text-primary underline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Thay đổi
+          </button>
+        </div>
+        <PasswordField
+          id="password"
+          label="Mật khẩu"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
+        <FormError>{error}</FormError>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
+        </Button>
+      </form>
+    );
+  }
+
   return (
     <form
-      onSubmit={submit}
+      onSubmit={handleUsernameSubmit}
       noValidate
       className="space-y-5"
       aria-busy={isSubmitting}
@@ -130,39 +230,27 @@ function LoginForm() {
           Username
         </label>
         <input
-          {...register('username')}
           id="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
           maxLength={64}
+          autoFocus
           className={inputClass}
-          aria-invalid={!!errors.username}
-          aria-describedby={errors.username ? 'username-error' : undefined}
+          aria-invalid={!!error && !username.trim()}
+          aria-describedby={error ? 'username-error' : undefined}
         />
-        {errors.username && (
-          <p
-            id="username-error"
-            className="mt-2 text-sm text-red-700 dark:text-red-300"
-          >
-            Vui lòng kiểm tra username.
-          </p>
-        )}
       </div>
-      <PasswordField
-        id="password"
-        label="Mật khẩu"
-        registration={register('password')}
-        autoComplete="current-password"
-        error={errors.password ? 'Vui lòng nhập mật khẩu.' : undefined}
-      />
       <FormError>{error}</FormError>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
+        {isSubmitting ? 'Đang kiểm tra…' : 'Tiếp tục'}
       </Button>
     </form>
   );
 }
+
 function SetupForm() {
   const router = useRouter();
   const [error, setError] = useState('');
@@ -176,7 +264,7 @@ function SetupForm() {
   const submit = handleSubmit(async (input) => {
     setError('');
     try {
-      const session = await postAuth('setup-password', input);
+      const session = await postSetup(input);
       router.replace(authDestination(session));
       router.refresh();
     } catch (error) {

@@ -27,7 +27,6 @@ export function UserDetailPanel({
 }) {
   const [user, setUser] = useState(initial);
   const [audit, setAudit] = useState(initialAudit);
-  const [temporary, setTemporary] = useState('');
   const [message, setMessage] = useState('');
   const [results, setResults] = useState<unknown[]>([]);
   const [topicId, setTopicId] = useState('cca-f');
@@ -45,7 +44,6 @@ export function UserDetailPanel({
       return;
     }
     setUser(data.user);
-    if (data.temporaryPassword) setTemporary(data.temporaryPassword);
     const logs = await fetch(`/api/v1/admin/users/${user.id}/audit`, {
       credentials: 'include',
     }).then((r) => r.json());
@@ -95,21 +93,13 @@ export function UserDetailPanel({
           disabled={disabled || user.id === currentAdminId}
           onClick={() =>
             window.confirm(
-              'Cấp mật khẩu tạm mới? Các phiên hiện tại sẽ bị thu hồi.',
+              'Đặt lại mật khẩu cho tài khoản này? Người dùng sẽ tự đặt lại mật khẩu mới khi đăng nhập tiếp theo.',
             ) && action(`/api/v1/admin/users/${user.id}/reset-password`)
           }
           className="rounded border border-border px-4 py-2"
         >
           Đặt lại mật khẩu
         </button>
-        {temporary && (
-          <p
-            role="status"
-            className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-950"
-          >
-            Mật khẩu tạm (chỉ hiện lần này): <code>{temporary}</code>
-          </p>
-        )}
       </div>
       {message && (
         <p role="alert" className="text-sm text-red-700">

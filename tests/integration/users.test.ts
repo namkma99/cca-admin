@@ -35,12 +35,11 @@ beforeEach(async () => {
     })
     .returning();
   const auth = new AuthService(fixture.db, { now: () => now });
-  token = (
-    await auth.login(
-      { username: 'admin', password: 'admin-password-123' },
-      '127.0.0.1',
-    )
-  ).token;
+  const adminLogin = await auth.login(
+    { username: 'admin', password: 'admin-password-123' },
+    '127.0.0.1',
+  );
+  token = 'token' in adminLogin ? adminLogin.token : '';
   expect(admin).toBeTruthy();
   service = new UserService(fixture.db, { now: () => now });
 });
@@ -63,10 +62,12 @@ describe('UserService', () => {
     const pending = await service.create(token, { username: 'pending-user' });
     const auth = new AuthService(fixture.db, { now: () => now });
     const setup = await auth.login(
-      { username: pending.user.username, password: pending.temporaryPassword },
+      { username: pending.user.username },
       '127.0.0.1',
     );
-    await expect(service.list(setup.token)).rejects.toMatchObject({
+    expect('token' in setup).toBe(true);
+    const setupToken = 'token' in setup ? setup.token : '';
+    await expect(service.list(setupToken)).rejects.toMatchObject({
       code: 'FORBIDDEN',
       status: 403,
     });
@@ -84,7 +85,9 @@ describe('UserService', () => {
       { username: 'student', password: 'student-password-123' },
       '127.0.0.1',
     );
-    await expect(service.list(student.token)).rejects.toMatchObject({
+    expect('token' in student).toBe(true);
+    const studentToken = 'token' in student ? student.token : '';
+    await expect(service.list(studentToken)).rejects.toMatchObject({
       code: 'FORBIDDEN',
       status: 403,
     });
@@ -102,34 +105,33 @@ describe('UserService', () => {
     expect(result.users[0]).not.toHaveProperty('passwordHash');
   });
 
-  it('creates a pending student and returns a one-time temporary password', async () => {
+  it('creates a pending student without temporary password', async () => {
     const result = await service.create(token, { username: 'New.Student' });
     expect(result.user).toMatchObject({
       username: 'new.student',
       role: 'student',
       status: 'pending_password',
     });
-    expect(result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(result).not.toHaveProperty('temporaryPassword');
     const [stored] = await fixture.db
       .select()
       .from(users)
       .where(eq(users.username, 'new.student'));
-    expect(stored?.passwordHash).not.toBe(result.temporaryPassword);
+    expect(stored?.passwordHash).toBeNull();
     expect(await fixture.db.select().from(adminAuditLogs)).toHaveLength(1);
   });
 
   it('disables a user, revokes all sessions, and writes an audit event', async () => {
     const created = await service.create(token, { username: 'locked' });
     const auth = new AuthService(fixture.db, { now: () => now });
-    const setup = await auth.login(
-      { username: 'locked', password: created.temporaryPassword },
-      '127.0.0.1',
-    );
+    const setup = await auth.login({ username: 'locked' }, '127.0.0.1');
+    expect('token' in setup).toBe(true);
+    const setupToken = 'token' in setup ? setup.token : '';
     const result = await service.setStatus(token, created.user.id, {
       disabled: true,
     });
     expect(result.user.status).toBe('disabled');
-    expect(await auth.getSession(setup.token)).toBeNull();
+    expect(await auth.getSession(setupToken)).toBeNull();
     expect(
       (await fixture.db.select().from(adminAuditLogs)).map((x) => x.action),
     ).toContain('disable_user');
@@ -146,9 +148,13 @@ describe('UserService', () => {
   it('resets a password and keeps the user pending until setup', async () => {
     const created = await service.create(token, { username: 'reset.me' });
     const result = await service.resetPassword(token, created.user.id);
-    expect(result.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{32}$/);
-    expect(result.temporaryPassword).not.toBe(created.temporaryPassword);
     expect(result.user.status).toBe('pending_password');
+    expect(result).not.toHaveProperty('temporaryPassword');
+    const [stored] = await fixture.db
+      .select()
+      .from(users)
+      .where(eq(users.username, 'reset.me'));
+    expect(stored?.passwordHash).toBeNull();
   });
 
   it('restores pending status after reset, disable, and enable without activating repeatedly', async () => {

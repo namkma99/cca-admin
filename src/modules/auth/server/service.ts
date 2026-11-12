@@ -39,6 +39,10 @@ function usable(user: UserRow, session: SessionRow, now: Date) {
   );
 }
 
+export type LoginResult =
+  | { token: string; session: AuthSession }
+  | { needPassword: true; username: string };
+
 export class AuthService {
   private readonly now: () => Date;
   constructor(
@@ -87,10 +91,7 @@ export class AuthService {
       );
   }
 
-  async login(
-    input: unknown,
-    ip: string,
-  ): Promise<{ token: string; session: AuthSession }> {
+  async login(input: unknown, ip: string): Promise<LoginResult> {
     const parsed = loginSchema.safeParse(input);
     if (!parsed.success)
       throw new AuthError(
@@ -111,18 +112,65 @@ export class AuthService {
       .from(users)
       .where(eq(users.username, username))
       .limit(1);
-    const correct = await verifyPassword(
-      password,
-      original?.passwordHash ?? DUMMY_PASSWORD_HASH,
-    );
+
     const invalid = () =>
       new AuthError(
         'INVALID_CREDENTIALS',
         401,
         'Username hoặc mật khẩu không chính xác.',
       );
-    if (!original || !correct || original.status === 'disabled')
+
+    if (!original || original.status === 'disabled') {
+      await verifyPassword(password ?? 'dummy', DUMMY_PASSWORD_HASH);
       throw invalid();
+    }
+
+    // Step 1: User without password / first-time login
+    if (original.status === 'pending_password') {
+      if (original.passwordHash && password) {
+        const correct = await verifyPassword(password, original.passwordHash);
+        if (!correct) throw invalid();
+      }
+      return this.db.transaction(async (tx) => {
+        const [user] = await tx
+          .select()
+          .from(users)
+          .where(eq(users.id, original.id))
+          .for('update');
+        if (!user || user.status !== 'pending_password') throw invalid();
+        const now = this.now();
+        const token = createSessionToken();
+        const [session] = await tx
+          .insert(authSessions)
+          .values({
+            userId: user.id,
+            tokenHash: hashSessionToken(token),
+            kind: 'password_setup',
+            expiresAt: new Date(now.getTime() + SETUP_SESSION_MS),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!session) throw new Error('Session insert failed');
+        await tx
+          .update(users)
+          .set({ lastLoginAt: now, updatedAt: now })
+          .where(eq(users.id, user.id));
+        return { token, session: toSession(user, session) };
+      });
+    }
+
+    // User is active: if password is not provided yet, request password step
+    if (!password) {
+      return { needPassword: true, username: original.username };
+    }
+
+    const correct = await verifyPassword(
+      password,
+      original.passwordHash ?? DUMMY_PASSWORD_HASH,
+    );
+    if (!correct) throw invalid();
+
     return this.db.transaction(async (tx) => {
       const [user] = await tx
         .select()
@@ -132,23 +180,18 @@ export class AuthService {
       if (
         !user ||
         user.passwordHash !== original.passwordHash ||
-        user.status === 'disabled'
+        user.status !== 'active'
       )
         throw invalid();
       const now = this.now();
       const token = createSessionToken();
-      const kind =
-        user.status === 'pending_password' ? 'password_setup' : 'authenticated';
       const [session] = await tx
         .insert(authSessions)
         .values({
           userId: user.id,
           tokenHash: hashSessionToken(token),
-          kind,
-          expiresAt: new Date(
-            now.getTime() +
-              (kind === 'password_setup' ? SETUP_SESSION_MS : AUTH_SESSION_MS),
-          ),
+          kind: 'authenticated',
+          expiresAt: new Date(now.getTime() + AUTH_SESSION_MS),
           createdAt: now,
           updatedAt: now,
         })
@@ -216,7 +259,10 @@ export class AuthService {
       [[`setup:user:${hashSessionToken(original.user.id)}`, 5]],
       SETUP_SESSION_MS,
     );
-    if (await verifyPassword(parsed.data.password, original.user.passwordHash))
+    if (
+      original.user.passwordHash &&
+      (await verifyPassword(parsed.data.password, original.user.passwordHash))
+    )
       throw new AuthError(
         'PASSWORD_REUSE',
         400,

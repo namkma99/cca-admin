@@ -77,11 +77,14 @@ export function createAuthHandlers({
           ? service.login(input, clientIp(request, config.onVercel))
           : service.setupPassword(token, input),
       );
-      headers.set(
-        'Set-Cookie',
-        sessionCookie(issued.token, issued.session.expiresAt, config),
-      );
-      return Response.json({ session: issued.session }, { headers });
+      if ('token' in issued && issued.token) {
+        headers.set(
+          'Set-Cookie',
+          sessionCookie(issued.token, issued.session.expiresAt, config),
+        );
+        return Response.json({ session: issued.session }, { headers });
+      }
+      return Response.json(issued, { headers });
     } catch (error) {
       const expected = error instanceof AuthError || error instanceof AppError;
       if (!expected)
