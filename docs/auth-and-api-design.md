@@ -1,9 +1,11 @@
 # Thiết kế CCA API và Admin trên Vercel
 
-Cập nhật ngày 2026-11-12. Tài liệu mô tả nghiệp vụ và chuyển đổi từ API SQLite sang Next.js trên Vercel và Neon. Đã có scaffold Next.js và schema/migration 8 bảng; chưa triển khai nghiệp vụ auth/API/admin hoặc migrate Neon. Đã chốt cấu trúc 8 bảng và hướng triển khai gọn cho khoảng 10 user, sử dụng không thường xuyên. Chi tiết còn cần xác nhận được ghi riêng, không coi là đã duyệt.
+Cập nhật ngày 2026-11-12. Tài liệu mô tả nghiệp vụ và chuyển đổi từ API SQLite sang Next.js trên Vercel và Neon. Đã có scaffold Next.js và schema/migration 8 bảng; đã triển khai auth API/UI, phiên đăng nhập và script tạo admin; chưa triển khai user CRUD/thi hoặc migrate Neon. Đã chốt cấu trúc 8 bảng và hướng triển khai gọn cho khoảng 10 user, sử dụng không thường xuyên. Chi tiết còn cần xác nhận được ghi riêng, không coi là đã duyệt.
 
 - [Kiến trúc, công nghệ và structure](architecture.md).
 - [Schema 8 bảng và relationship](database-design.md).
+
+Chi tiết endpoint, env, rate limit và cách cấp admin: [auth-implementation.md](auth-implementation.md).
 
 ## Thành phần và quyền truy cập
 
@@ -13,12 +15,12 @@ Cập nhật ngày 2026-11-12. Tài liệu mô tả nghiệp vụ và chuyển �
 - Frontend CCA và Vercel nên dùng HTTPS trên cùng domain gốc để tránh phụ thuộc cookie bên thứ ba. CORS cho phép chính xác origin frontend, cho phép credentials; frontend gửi credentials khi gọi API.
 - Mọi API thi yêu cầu phiên hợp lệ. Mọi API quản lý user cần kiểm tra thêm quyền admin tại máy chủ; ẩn nút trên UI không thay thế kiểm tra quyền.
 
-## Luồng kích hoạt lần đầu được đề xuất
+## Luồng kích hoạt lần đầu đã triển khai
 
 Admin cấp trước username và mật khẩu tạm ngẫu nhiên riêng cho từng người. Database chỉ lưu hash. Người dùng đăng nhập đúng mật khẩu tạm mới được chuyển sang bước đặt mật khẩu chính thức.
 
 1. User ở trạng thái `pending_password` nhập username và mật khẩu tạm.
-2. API kiểm tra thông tin và cấp phiên ngắn loại `password_setup`, đề xuất 10 phút. Phiên này không được lấy câu hỏi hoặc gọi API admin.
+2. API kiểm tra thông tin và cấp phiên ngắn loại `password_setup`, 10 phút. Phiên này không được lấy câu hỏi hoặc gọi API admin.
 3. UI hiển thị mật khẩu mới và xác nhận mật khẩu.
 4. API cập nhật hash và trạng thái trong transaction, thu hồi phiên ngắn, cấp mã phiên mới có hiệu lực 24 giờ.
 5. Các lần đăng nhập sau dùng mật khẩu chính thức.

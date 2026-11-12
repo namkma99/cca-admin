@@ -73,7 +73,7 @@ afterEach(async () => {
 });
 
 describe('PostgreSQL migration constraints', () => {
-  it('creates exactly the eight application tables', async () => {
+  it('creates exactly the nine application tables', async () => {
     const result = await db.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`,
     );
@@ -85,6 +85,7 @@ describe('PostgreSQL migration constraints', () => {
       'exam_cycles',
       'questions',
       'rate_limits',
+      'settings',
       'users',
     ]);
   });
@@ -345,6 +346,25 @@ describe('PostgreSQL migration constraints', () => {
       `INSERT INTO exam_attempt_payloads(attempt_id, question_snapshot, answers) VALUES ($1, '[]'::jsonb, '[]'::jsonb)`,
       '23514',
       [id],
+    );
+  });
+
+  it('stores and updates application settings with valid json and user reference', async () => {
+    await db.query(
+      `INSERT INTO settings(key, value, description, updated_by)
+       VALUES ('exam_duration_minutes', '120'::jsonb, 'Default exam duration', $1)`,
+      [alice],
+    );
+    const read = await db.query<{ key: string; value: unknown }>(
+      `SELECT key, value FROM settings WHERE key = 'exam_duration_minutes'`,
+    );
+    expect(read.rows[0]?.value).toBe(120);
+
+    // Reject non-existent user reference
+    await rejectSql(
+      `INSERT INTO settings(key, value, updated_by) VALUES ('invalid_user', '{}'::jsonb, $1)`,
+      '23503',
+      ['00000000-0000-4000-8000-999999999999'],
     );
   });
 });

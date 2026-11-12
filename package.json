@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
@@ -14,7 +14,11 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "admin:create": "node --conditions=react-server --import tsx scripts/create-admin.ts",
+    "bank:import": "node --conditions=react-server --import tsx scripts/import-questions.ts",
+    "frontend:sync": "node --import tsx scripts/sync-cca-frontend.ts",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=22.14.0"
@@ -39,7 +43,11 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/postcss": "4.3.5",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.10",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -47,8 +55,10 @@
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.6",
+    "jsdom": "29.1.1",
     "prettier": "3.10.1",
     "tailwindcss": "4.3.5",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   },

@@ -7,4 +7,5 @@ export * from './exam-attempts';
 export * from './exam-attempt-payloads';
 export * from './rate-limits';
 export * from './admin-audit-logs';
+export * from './settings';
 export * from './relations';
