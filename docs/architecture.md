@@ -1,6 +1,6 @@
 # Kiến trúc, công nghệ và cấu trúc CCA API/Admin
 
-Cập nhật: 2026-11-12. Đã triển khai scaffold Next.js và schema/migration 8 bảng; chưa triển khai nghiệp vụ hoặc dịch vụ thật. Xem [hướng dẫn local](development.md). Quy mô mục tiêu khoảng 10 user, sử dụng không thường xuyên. Người dùng đã chốt 8 bảng; [database-design.md](database-design.md) là nguồn schema, [auth-and-api-design.md](auth-and-api-design.md) là nguồn quy tắc nghiệp vụ.
+Cập nhật: 2026-11-12. Đã triển khai scaffold Next.js và schema/migration 8 bảng; đã có auth API/UI và script tạo admin; chưa có user CRUD/thi hoặc dịch vụ production. Xem [hướng dẫn local](development.md). Quy mô mục tiêu khoảng 10 user, sử dụng không thường xuyên. Người dùng đã chốt 8 bảng; [database-design.md](database-design.md) là nguồn schema, [auth-and-api-design.md](auth-and-api-design.md) là nguồn quy tắc nghiệp vụ.
 
 ## Phạm vi và lựa chọn kiến trúc
 

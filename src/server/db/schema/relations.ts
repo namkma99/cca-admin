@@ -5,6 +5,7 @@ import { examCycles } from './exam-cycles';
 import { examAttempts } from './exam-attempts';
 import { examAttemptPayloads } from './exam-attempt-payloads';
 import { adminAuditLogs } from './admin-audit-logs';
+import { settings } from './settings';
 
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(authSessions),
@@ -47,5 +48,11 @@ export const adminAuditLogsRelations = relations(adminAuditLogs, ({ one }) => ({
     fields: [adminAuditLogs.targetUserId],
     references: [users.id],
     relationName: 'auditTarget',
+  }),
+}));
+export const settingsRelations = relations(settings, ({ one }) => ({
+  updatedByUser: one(users, {
+    fields: [settings.updatedBy],
+    references: [users.id],
   }),
 }));

@@ -21,7 +21,13 @@ export const adminAuditLogs = pgTable(
       .notNull()
       .references(() => users.id),
     action: text('action', {
-      enum: ['create_user', 'disable_user', 'enable_user', 'reset_password'],
+      enum: [
+        'create_user',
+        'disable_user',
+        'enable_user',
+        'reset_password',
+        'reset_exam_cycle',
+      ],
     }).notNull(),
     metadata: jsonb('metadata')
       .$type<Record<string, unknown>>()
@@ -36,7 +42,7 @@ export const adminAuditLogs = pgTable(
     index('admin_audit_target_created_idx').on(t.targetUserId, t.createdAt),
     check(
       'admin_audit_action_valid',
-      sql`${t.action} IN ('create_user', 'disable_user', 'enable_user', 'reset_password')`,
+      sql`${t.action} IN ('create_user', 'disable_user', 'enable_user', 'reset_password', 'reset_exam_cycle')`,
     ),
     check(
       'admin_audit_metadata_object',

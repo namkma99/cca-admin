@@ -7,3 +7,6 @@ next-env.d.ts
 drizzle/meta/
 data/
 docs/archive/
+
+# Formatted/typechecked using target frontend tooling.
+integrations/

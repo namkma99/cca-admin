@@ -1,0 +1,954 @@
+{
+  "info": {
+    "_postman_id": "c8a41703-9e45-4df3-a120-cf9673a38da0",
+    "name": "CCA Admin & Exam API",
+    "description": "Postman Collection hoàn chỉnh cho hệ thống CCA Admin & Exam Engine trên Next.js (Vercel & Neon PostgreSQL). Đã tích hợp sẵn header CSRF/Origin, test scripts tự động lưu token và ID.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Tự động bổ sung header Origin cho các mutation request (POST, PUT, DELETE)",
+          "// nhằm vượt qua kiểm tra CSRF/Origin bảo mật của server",
+          "if (pm.request.method !== 'GET' && pm.request.method !== 'HEAD') {",
+          "    if (!pm.request.headers.has('Origin')) {",
+          "        pm.request.headers.add({",
+          "            key: 'Origin',",
+          "            value: pm.variables.get('baseUrl') || 'http://localhost:3001'",
+          "        });",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "adminUsername",
+      "value": "admin_cca",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "AdminPassword@123456",
+      "type": "string"
+    },
+    {
+      "key": "studentUsername",
+      "value": "student_test",
+      "type": "string"
+    },
+    {
+      "key": "studentTempPassword",
+      "value": "2hEFM1LPcxg_YyqoJGBBQlWImVN2IoSj",
+      "type": "string"
+    },
+    {
+      "key": "studentPermanentPassword",
+      "value": "StudentPassword@123456",
+      "type": "string"
+    },
+    {
+      "key": "newPassword",
+      "value": "StudentPassword@123456",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "6d827baf-1c72-4250-9555-8e25c028c85c",
+      "type": "string"
+    },
+    {
+      "key": "attemptId",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "cronSecret",
+      "value": "local-cron-secret-cca-super-secret-key-32chars",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "description": "Các API xác thực, đăng nhập, thiết lập mật khẩu lần đầu và quản lý phiên làm việc.",
+      "item": [
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Admin authenticated session granted\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.session).to.be.an('object');",
+                  "    pm.expect(data.session.kind).to.eql('authenticated');",
+                  "    pm.expect(data.session.user.role).to.eql('admin');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Đăng nhập tài khoản Admin bằng username và mật khẩu chính thức. Máy chủ trả về Set-Cookie với thời hạn 24 giờ tuyệt đối."
+          }
+        },
+        {
+          "name": "Login (Student - Temp Password)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Session kind is password_setup (10 mins)\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.session).to.be.an('object');",
+                  "    pm.expect(data.session.kind).to.eql('password_setup');",
+                  "    pm.expect(data.session.user.role).to.eql('student');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{studentUsername}}\",\n  \"password\": \"{{studentTempPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Đăng nhập học viên lần đầu với mật khẩu tạm thời do Admin cấp. Trả về phiên ngắn hạn password_setup (10 phút) để chuyển hướng sang đổi mật khẩu."
+          }
+        },
+        {
+          "name": "Login (Student - Permanent Password)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Student authenticated session granted\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.session).to.be.an('object');",
+                  "    pm.expect(data.session.kind).to.eql('authenticated');",
+                  "    pm.expect(data.session.user.role).to.eql('student');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{studentUsername}}\",\n  \"password\": \"{{studentPermanentPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Đăng nhập học viên bằng mật khẩu chính thức sau khi đã kích hoạt tài khoản."
+          }
+        },
+        {
+          "name": "Get Current Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.session) {",
+                  "    console.log(\"Phiên hiện tại:\", data.session.user.username, \"|\", data.session.user.role, \"|\", data.session.kind);",
+                  "} else {",
+                  "    console.log(\"Chưa đăng nhập (Anonymous session: null)\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/session",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "session"]
+            },
+            "description": "Đọc trạng thái phiên đăng nhập hiện tại từ cookie cca_session. Trả về thông tin user hoặc session: null nếu chưa đăng nhập."
+          }
+        },
+        {
+          "name": "Setup Initial Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Account activated and session rotated\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.session).to.be.an('object');",
+                  "    pm.expect(data.session.kind).to.eql('authenticated');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{newPassword}}\",\n  \"confirmPassword\": \"{{newPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/setup-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "setup-password"]
+            },
+            "description": "Kích hoạt tài khoản và đặt mật khẩu chính thức trong phiên password_setup (10 phút). Yêu cầu mật khẩu từ 12-128 ký tự và khác mật khẩu tạm."
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Logout successful\", function () {",
+                  "    var data = pm.response.json();",
+                  "    pm.expect(data.ok).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "Đăng xuất, thu hồi phiên làm việc trong database và xóa session cookie."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin - User Management",
+      "description": "Các API quản lý người dùng dành riêng cho vai trò Admin (yêu cầu session cookie vai trò admin).",
+      "item": [
+        {
+          "name": "List & Search Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "pm.expect(data.users).to.be.an('array');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Từ khóa tìm kiếm theo username (tùy chọn)"
+                }
+              ]
+            },
+            "description": "Lấy danh sách người dùng hoặc tìm kiếm theo username."
+          }
+        },
+        {
+          "name": "Create Student User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.user && data.user.id) {",
+                  "    pm.environment.set(\"userId\", data.user.id);",
+                  "    pm.collectionVariables.set(\"userId\", data.user.id);",
+                  "}",
+                  "if (data.temporaryPassword) {",
+                  "    pm.environment.set(\"studentTempPassword\", data.temporaryPassword);",
+                  "    pm.collectionVariables.set(\"studentTempPassword\", data.temporaryPassword);",
+                  "    console.log(\"Mật khẩu tạm của học viên mới:\", data.temporaryPassword);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"student_{{$randomInt}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users"]
+            },
+            "description": "Tạo tài khoản học viên mới với trạng thái pending_password và sinh mật khẩu tạm thời ngẫu nhiên (chỉ trả về 1 lần duy nhất)."
+          }
+        },
+        {
+          "name": "Get User Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}"]
+            },
+            "description": "Lấy thông tin chi tiết của người dùng theo UUID."
+          }
+        },
+        {
+          "name": "Update User Status (Lock/Unlock)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"disabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "status"]
+            },
+            "description": "Khóa hoặc mở khóa tài khoản người dùng. Khóa tài khoản sẽ thu hồi tất cả phiên và kết thúc bài thi đang chạy."
+          }
+        },
+        {
+          "name": "Reset User Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.temporaryPassword) {",
+                  "    pm.environment.set(\"studentTempPassword\", data.temporaryPassword);",
+                  "    pm.collectionVariables.set(\"studentTempPassword\", data.temporaryPassword);",
+                  "    console.log(\"Mật khẩu tạm thời mới:\", data.temporaryPassword);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}",
+                "reset-password"
+              ]
+            },
+            "description": "Đặt lại mật khẩu cho học viên. Sinh mật khẩu tạm mới, chuyển trạng thái về pending_password và thu hồi tất cả phiên cũ."
+          }
+        },
+        {
+          "name": "Reset Topic Cycle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topicId\": \"cca-f\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/reset-cycle",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{userId}}",
+                "reset-cycle"
+              ]
+            },
+            "description": "Đặt lại chu kỳ làm bài cho 1 chủ đề (cca-f | ccao-f | ccar-p). Đóng chu kỳ hiện tại, cho phép thi lại 10 đề mới và vẫn bảo lưu lịch sử kết quả cũ."
+          }
+        },
+        {
+          "name": "Get User Exam History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/results",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "results"]
+            },
+            "description": "Xem toàn bộ lịch sử điểm số và kết quả bài thi của học viên."
+          }
+        },
+        {
+          "name": "Get User Audit Logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/audit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "audit"]
+            },
+            "description": "Xem nhật ký thay đổi trạng thái quản trị đối với tài khoản học viên (khóa, mở khóa, đổi mật khẩu, reset chu kỳ)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Exam Engine",
+      "description": "Các API phòng thi và làm bài thi dành cho học viên đã đăng nhập.",
+      "item": [
+        {
+          "name": "Get Exam Catalog",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/catalog",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "exams", "catalog"]
+            },
+            "description": "Lấy danh mục các bài thi (CCA-F, CCAO-F, CCAR-P), số câu, thời lượng và trạng thái chu kỳ hiện tại của học viên."
+          }
+        },
+        {
+          "name": "Get Exam Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "exams", "dashboard"]
+            },
+            "description": "Lấy tổng quan bảng điều khiển: bài thi đang làm dở (nếu có), số đề đã hoàn thành trong chu kỳ và lịch sử tóm tắt."
+          }
+        },
+        {
+          "name": "Start Exam Attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "if (data.attempt && data.attempt.id) {",
+                  "    pm.environment.set(\"attemptId\", data.attempt.id);",
+                  "    pm.collectionVariables.set(\"attemptId\", data.attempt.id);",
+                  "    console.log(\"Đã bắt đầu bài thi với attemptId:\", data.attempt.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topicId\": \"cca-f\",\n  \"formNumber\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/attempts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "exams", "attempts"]
+            },
+            "description": "Bắt đầu làm một đề thi mới (formNumber từ 1 đến 10). Tự động lưu attemptId vào biến môi trường để sử dụng cho các API tiếp theo."
+          }
+        },
+        {
+          "name": "Get Attempt Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/attempts/{{attemptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "exams", "attempts", "{{attemptId}}"]
+            },
+            "description": "Lấy thông tin và trạng thái của bài thi đang chạy (thời gian còn lại, danh sách câu hỏi snapshot và đáp án đã chọn)."
+          }
+        },
+        {
+          "name": "Save Question Answer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionId\": \"cca-f-001\",\n  \"choiceIds\": [\"A\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/attempts/{{attemptId}}/answers",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "attempts",
+                "{{attemptId}}",
+                "answers"
+              ]
+            },
+            "description": "Lưu câu trả lời của thí sinh cho một câu hỏi trong khi bài thi còn hiệu lực."
+          }
+        },
+        {
+          "name": "Submit Exam",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var data = pm.response.json();",
+                  "console.log(\"Điểm số bài thi:\", data.score, \"/ 1000 | Đúng:\", data.correctCount, \"/\", data.totalQuestions);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/attempts/{{attemptId}}/submit",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "attempts",
+                "{{attemptId}}",
+                "submit"
+              ]
+            },
+            "description": "Nộp bài thi chủ động. Máy chủ chấm điểm dựa trên đáp án gốc, lưu kết quả tổng kết, xóa snapshot chi tiết và trả về điểm số."
+          }
+        },
+        {
+          "name": "Abandon Exam",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/exams/attempts/{{attemptId}}/abandon",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "exams",
+                "attempts",
+                "{{attemptId}}",
+                "abandon"
+              ]
+            },
+            "description": "Hủy bỏ bài thi đang làm dở (bài thi bị tính trạng thái abandoned và vẫn tiêu tốn lượt đề thi trong chu kỳ)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Internal / Maintenance",
+      "description": "Các API bảo trì nội bộ và Cron Job.",
+      "item": [
+        {
+          "name": "Cron Daily Cleanup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{cronSecret}}",
+                "description": "Khóa bảo mật CRON_SECRET được cấu hình trên Vercel"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/cron",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "internal", "cron"]
+            },
+            "description": "Dọn dẹp tự động hàng ngày: tự động nộp bài (finalize timed_out) cho các bài thi quá hạn 120 phút, xóa phiên làm việc hết hạn và reset bộ đếm rate limit."
+          }
+        }
+      ]
+    }
+  ]
+}

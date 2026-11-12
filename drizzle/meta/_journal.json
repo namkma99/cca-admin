@@ -8,6 +8,20 @@
       "when": 1794492832979,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794495671881,
+      "tag": "0001_admin_cycle_reset",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794502026413,
+      "tag": "0002_add_settings_table",
+      "breakpoints": true
     }
   ]
 }

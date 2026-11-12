@@ -4,7 +4,7 @@
 
 Đã có scaffold Next.js App Router, React, TypeScript strict, Tailwind, cấu hình shadcn/ui và Button nền tảng; schema Drizzle 8 bảng, relations và migration đầu tiên. Thư mục module/route được chuẩn bị theo kiến trúc. Những thư mục có .gitkeep chưa phải tính năng hoạt động.
 
-Chỉ có trang chủ thông báo chuẩn bị và trang lỗi/404. Chưa có API auth/admin/exam, middleware phân quyền, import câu hỏi, cấp admin hay endpoint Cron. Chưa bật lịch Cron để tránh gọi endpoint chưa có nghiệp vụ. Chưa có UI đăng nhập/quản lý user.
+Đã có auth API login/session/setup-password/logout, UI login/setup, page guard admin/account và script tạo admin. Xem [auth-implementation.md](auth-implementation.md) để cấu hình origin, cấp tài khoản và kiểm tra contract. Chưa có user CRUD, import câu hỏi, API thi hoặc Cron; không có endpoint đăng ký công khai.
 
 ## Chạy local
 

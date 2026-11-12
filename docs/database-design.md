@@ -35,7 +35,7 @@ Cập nhật: 2026-11-12. Đã chốt số lượng và trách nhiệm 8 bảng 
 | revoked_at             | TIMESTAMPTZ nullable                    | Thời điểm thu hồi                            |
 | created_at, updated_at | TIMESTAMPTZ                             | Thời điểm tạo/cập nhật                       |
 
-Index user_id phục vụ thu hồi phiên; index expires_at phục vụ dọn dẹp. CHECK expires_at > created_at. Password setup dự kiến 10 phút, còn cần xác nhận cùng chính sách kích hoạt. API luôn kiểm tra cả user.status và kind; phiên setup không được thi hoặc gọi admin API.
+Index user_id phục vụ thu hồi phiên; index expires_at phục vụ dọn dẹp. CHECK expires_at > created_at. Password setup đã triển khai hạn 10 phút; phiên authenticated giữ hạn tuyệt đối 24 giờ. API luôn kiểm tra cả user.status và kind; phiên setup không được thi hoặc gọi admin API.
 
 ## 3. questions
 
@@ -119,7 +119,7 @@ Sau finalize không có lịch sử từng câu. Xóa là ở mức ứng dụng
 | count             | INTEGER CHECK >= 0 | Số lần thử                                                      |
 | expires_at        | TIMESTAMPTZ        | Hạn bucket để dọn dẹp                                           |
 
-Không FK tới users: cần kiểm soát cả IP và username chưa tồn tại. Cập nhật bộ đếm nguyên tử bằng UPSERT/khóa phù hợp, không read rồi write riêng. Index expires_at để cleanup; CHECK expires_at > window_started_at. Ngưỡng và thời lượng cửa sổ là config cần xác định trước khi viết auth; không log raw password/token trong key.
+Không FK tới users: cần kiểm soát cả IP và username chưa tồn tại. Cập nhật bộ đếm nguyên tử bằng UPSERT/khóa phù hợp, không read rồi write riêng. Index expires_at để cleanup; CHECK expires_at > window_started_at. Auth đã dùng cửa sổ login 15 phút (10/username, 50/IP) và setup 10 phút (5/user); không log raw password/token trong key.
 
 ## 8. admin_audit_logs
 
@@ -187,7 +187,7 @@ Mọi lần finalize phải đối chiếu deadline: nếu đã hết giờ thì
 
 - Ai có quyền reset chu kỳ/lượt, reset có giữ summary cũ hay xóa, xử lý bài đang chạy ra sao.
 - Có cho sửa username/role, ai được làm và bảo vệ admin cuối cùng như thế nào.
-- Cấp lại mật khẩu tạm, TTL phiên setup và chính sách mật khẩu cụ thể.
+- Chính sách cấp lại mật khẩu tạm qua admin UI; setup 10 phút và mật khẩu mới 12–128 ký tự đã được triển khai.
 - Yêu cầu đăng nhập lại khi phiên còn dưới 120 phút; xử lý bài khi khóa tài khoản hoặc phiên hết hạn.
 - Có dữ liệu production SQLite phải chuyển không; domain và origin thực tế.
 
