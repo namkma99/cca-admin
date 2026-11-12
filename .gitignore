@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+.env*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+.vercel/
+
+# Private question bank and import source; never publish answer-bearing data.
+data/
