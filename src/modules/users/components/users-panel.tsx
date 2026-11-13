@@ -238,6 +238,7 @@ export function UsersPanel({
                 onClick={() => {
                   setQuery('');
                   setStatus('');
+                  setRole('');
                 }}
               >
                 Clear filters

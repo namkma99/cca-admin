@@ -54,4 +54,7 @@ it('filters by role and status without mixing up admin and student permissions',
   expect(screen.queryByRole('link', { name: 'root' })).not.toBeInTheDocument();
   await userEvent.selectOptions(screen.getByLabelText('Status'), 'disabled');
   expect(screen.getByText('No users found')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(screen.getByLabelText('Role')).toHaveValue('');
+  expect(screen.getByRole('link', { name: 'root' })).toBeVisible();
 });
