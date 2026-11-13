@@ -61,6 +61,15 @@ describe('SettingsService', () => {
       passingScorePercentage: 70,
       systemName: 'CCA Exam System',
       allowReviewAnswers: true,
+      auth: {
+        sessionDurationMinutes: 1440,
+        passwordSetupDurationMinutes: 10,
+        loginRateLimit: {
+          windowMinutes: 15,
+          maxAttemptsPerUsername: 10,
+          maxAttemptsPerIp: 50,
+        },
+      },
     });
   });
 
@@ -79,6 +88,15 @@ describe('SettingsService', () => {
       passingScorePercentage: 75,
       systemName: 'Custom CCA Portal',
       allowReviewAnswers: false,
+      auth: {
+        sessionDurationMinutes: 1440,
+        passwordSetupDurationMinutes: 10,
+        loginRateLimit: {
+          windowMinutes: 15,
+          maxAttemptsPerUsername: 10,
+          maxAttemptsPerIp: 50,
+        },
+      },
     });
 
     const read = await service.getAll();

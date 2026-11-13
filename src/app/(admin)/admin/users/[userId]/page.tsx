@@ -1,10 +1,10 @@
-import { AppError } from '@/server/http/errors';
-import { z } from 'zod';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { requirePageSession } from '@/modules/auth/server/page-session';
 import { withDatabase } from '@/server/db/client';
 import { UserService } from '@/modules/users/server/service';
+import { AppError } from '@/server/http/errors';
+import { z } from 'zod';
 import { UserDetailPanel } from '@/modules/users/components/user-detail-panel';
 
 export default async function AdminUserDetailPage({

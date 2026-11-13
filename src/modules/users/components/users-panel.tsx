@@ -15,12 +15,15 @@ import {
 
 export function UsersPanel({
   initialUsers = [],
+  currentAdminId,
 }: {
   initialUsers?: AdminUser[];
+  currentAdminId?: string;
 }) {
   const [users, setUsers] = useState(initialUsers);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [role, setRole] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -68,6 +71,7 @@ export function UsersPanel({
       setUsername('');
       setQuery('');
       setStatus('');
+      setRole('');
       setSuccess(
         `Student "${data.user.username}" created. They will set their password when they first sign in.`,
       );
@@ -76,7 +80,8 @@ export function UsersPanel({
   const filtered = users.filter(
     (user) =>
       user.username.toLowerCase().includes(query.trim().toLowerCase()) &&
-      (!status || user.status === status),
+      (!status || user.status === status) &&
+      (!role || user.role === role),
   );
   return (
     <div className="space-y-6" aria-busy={pending}>
@@ -125,6 +130,18 @@ export function UsersPanel({
               onChange={(event) => setQuery(event.target.value)}
               className={inputClass}
             />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium">
+            Role
+            <select
+              className={inputClass}
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+            >
+              <option value="">All roles</option>
+              <option value="admin">Administrator</option>
+              <option value="student">Student</option>
+            </select>
           </label>
           <label className="grid gap-1.5 text-sm font-medium">
             Status
@@ -176,6 +193,11 @@ export function UsersPanel({
                     >
                       {user.username}
                     </Link>
+                    {user.id === currentAdminId && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        You
+                      </span>
+                    )}
                   </td>
                   <td>{label(user.role)}</td>
                   <td>
@@ -209,7 +231,7 @@ export function UsersPanel({
                 ? 'Try another search or status filter.'
                 : 'Create a student account to get started.'}
             </p>
-            {(query || status) && (
+            {(query || status || role) && (
               <Button
                 className="mt-3"
                 variant="outline"

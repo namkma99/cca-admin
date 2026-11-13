@@ -162,6 +162,33 @@ describe('auth forms', () => {
       confirmPassword: 'permanent-password-123',
     });
   });
+  it('shows the admin-only login error without navigating or asking for a password', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              code: 'FORBIDDEN',
+              message: 'You do not have permission to perform this action.',
+            },
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<AuthForm mode="login" />);
+    await user.type(screen.getByLabelText('Username'), 'student');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You do not have permission to perform this action.',
+    );
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
   it('disables submit while a request is pending and recovers after network failure', async () => {
     const user = userEvent.setup();
     let fail!: (error: Error) => void;

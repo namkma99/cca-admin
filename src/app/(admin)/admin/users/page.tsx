@@ -5,7 +5,7 @@ import { UserService } from '@/modules/users/server/service';
 import { withDatabase } from '@/server/db/client';
 
 export default async function AdminUsersPage() {
-  await requirePageSession('admin');
+  const session = await requirePageSession('admin');
   const cookieName =
     process.env.NODE_ENV === 'production'
       ? '__Host-cca_session'
@@ -16,14 +16,17 @@ export default async function AdminUsersPage() {
   );
 
   return (
-    <section className="space-y-8">
+    <section className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Users</h1>
-        <p className="mt-2 text-muted-foreground">
-          Create student accounts, review activity and manage account access.
+        <h1 className="text-3xl font-semibold tracking-tight">Users</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Manage account roles, access status and exam history.
         </p>
       </div>
-      <UsersPanel initialUsers={initialUsers} />
+      <UsersPanel
+        initialUsers={initialUsers}
+        currentAdminId={session.user.id}
+      />
     </section>
   );
 }

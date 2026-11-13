@@ -1,4 +1,5 @@
 import 'server-only';
+import { eq } from 'drizzle-orm';
 import { settings } from '@/server/db/schema';
 import type { AuthDatabase } from '@/modules/auth/server/types';
 import {
@@ -7,9 +8,23 @@ import {
   type AppSettings,
 } from '../contracts/schemas';
 import { AppError } from '@/server/http/errors';
+import {
+  authSettingsSchema,
+  DEFAULT_AUTH_SETTINGS,
+  type AuthSettings,
+} from '../contracts/auth';
 
 export class SettingsService {
   constructor(private readonly db: AuthDatabase) {}
+
+  async getAuth(): Promise<AuthSettings> {
+    const [row] = await this.db
+      .select({ value: settings.value })
+      .from(settings)
+      .where(eq(settings.key, 'auth'))
+      .limit(1);
+    return authSettingsSchema.parse(row ? row.value : {});
+  }
 
   async getAll(): Promise<AppSettings> {
     const rows = await this.db.select().from(settings);
@@ -21,6 +36,7 @@ export class SettingsService {
       passingScorePercentage: map.get('passing_score_percentage'),
       systemName: map.get('system_name'),
       allowReviewAnswers: map.get('allow_review_answers'),
+      auth: map.get('auth'),
     });
   }
 
@@ -75,6 +91,32 @@ export class SettingsService {
     }
 
     await this.db.transaction(async (tx) => {
+      if (data.auth !== undefined) {
+        // Ensure a row exists, then serialize partial updates to avoid losing
+        // fields when two admins edit separate parts of the policy.
+        await tx
+          .insert(settings)
+          .values({ key: 'auth', value: DEFAULT_AUTH_SETTINGS })
+          .onConflictDoNothing();
+        const [current] = await tx
+          .select()
+          .from(settings)
+          .where(eq(settings.key, 'auth'))
+          .for('update');
+        const previous = authSettingsSchema.parse(current!.value);
+        updates.push({
+          key: 'auth',
+          value: authSettingsSchema.parse({
+            ...previous,
+            ...data.auth,
+            loginRateLimit: {
+              ...previous.loginRateLimit,
+              ...data.auth.loginRateLimit,
+            },
+          }),
+          description: 'Thời hạn phiên và giới hạn đăng nhập',
+        });
+      }
       for (const item of updates) {
         await tx
           .insert(settings)

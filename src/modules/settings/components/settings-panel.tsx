@@ -1,13 +1,43 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { AdminFeedback } from '@/components/ui/admin-feedback';
 import { requestJson } from '@/shared/http/request-json';
 import type { AppSettings } from '../contracts/schemas';
 
 const inputClass =
   'mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+const sessionFields = [
+  {
+    key: 'sessionDurationMinutes',
+    label: 'Session duration (minutes)',
+    max: 43200,
+  },
+  {
+    key: 'passwordSetupDurationMinutes',
+    label: 'Password setup session duration (minutes)',
+    max: 60,
+  },
+] as const;
+const rateLimitFields = [
+  {
+    key: 'windowMinutes',
+    label: 'Sign-in rate limit window (minutes)',
+    max: 1440,
+  },
+  {
+    key: 'maxAttemptsPerUsername',
+    label: 'Maximum sign-in attempts per account',
+    max: 10000,
+  },
+  {
+    key: 'maxAttemptsPerIp',
+    label: 'Maximum sign-in attempts per IP',
+    max: 10000,
+  },
+] as const;
 
 export function SettingsPanel({
   initialSettings,
@@ -54,42 +84,27 @@ export function SettingsPanel({
     <section className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Link
-            href="/admin"
-            className="text-sm text-muted-foreground underline"
-          >
-            ← Admin overview
-          </Link>
-          <h1 className="mt-2 text-3xl font-semibold">System settings</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            System settings
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage CCA exam configuration and system preferences.
+            Manage exam configuration, authentication and system preferences.
           </p>
         </div>
       </div>
 
-      {message && (
-        <div
-          role="status"
-          className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100"
-        >
-          {message}
-        </div>
-      )}
+      <AdminFeedback success={message} />
+      <AdminFeedback error={error} />
 
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
-        >
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6"
+        aria-busy={isSubmitting}
+      >
         <fieldset disabled={isSubmitting} className="space-y-6">
           {/* Card 1: Exam Settings */}
-          <div className="rounded-xl border border-border bg-background p-6 shadow-xs space-y-5">
-            <h2 className="text-xl font-semibold">Exam settings</h2>
+          <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs space-y-5">
+            <h2 className="text-base font-semibold">Exam settings</h2>
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -134,8 +149,8 @@ export function SettingsPanel({
                   className={inputClass}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Number of exam forms per topic in each cycle. Range: 1–50.
-                  Default: 10.
+                  Number of forms per topic in each cycle. Range: 1–50. Default:
+                  10.
                 </p>
               </div>
 
@@ -168,8 +183,8 @@ export function SettingsPanel({
           </div>
 
           {/* Card 2: General Settings */}
-          <div className="rounded-xl border border-border bg-background p-6 shadow-xs space-y-5">
-            <h2 className="text-xl font-semibold">General settings</h2>
+          <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs space-y-5">
+            <h2 className="text-base font-semibold">General settings</h2>
 
             <div className="space-y-4">
               <div>
@@ -208,39 +223,112 @@ export function SettingsPanel({
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Answer review is a stored preference. The current exam API does
-                not provide answer review.
+                Answer review after exam submission is a stored preference. The
+                separate Review API does not use this setting.
               </p>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p role="status" className="text-sm text-muted-foreground">
-              {dirty ? 'You have unsaved changes.' : 'All changes saved.'}
+          <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-xs space-y-5">
+            <h2 className="text-base font-semibold">
+              Authentication and sessions
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              New durations apply to sessions issued after saving. Existing
+              sessions keep their expiry time.
             </p>
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting || !dirty}
-                onClick={() => {
-                  setForm(saved);
-                  setMessage('');
-                  setError('');
-                }}
-              >
-                Discard changes
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !dirty}
-                className="min-w-32"
-              >
-                {isSubmitting ? 'Saving…' : 'Save settings'}
-              </Button>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {sessionFields.map(({ key, label, max }) => (
+                <div key={key}>
+                  <label htmlFor={key} className="text-sm font-medium">
+                    {label}
+                  </label>
+                  <input
+                    id={key}
+                    type="number"
+                    min={1}
+                    max={max}
+                    step={1}
+                    required
+                    value={form.auth[key]}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        auth: { ...form.auth, [key]: Number(e.target.value) },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    From 1 to {max} minutes.
+                  </p>
+                </div>
+              ))}
+              {rateLimitFields.map(({ key, label, max }) => (
+                <div key={key}>
+                  <label htmlFor={key} className="text-sm font-medium">
+                    {label}
+                  </label>
+                  <input
+                    id={key}
+                    type="number"
+                    min={1}
+                    max={max}
+                    step={1}
+                    required
+                    value={form.auth.loginRateLimit[key]}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        auth: {
+                          ...form.auth,
+                          loginRateLimit: {
+                            ...form.auth.loginRateLimit,
+                            [key]: Number(e.target.value),
+                          },
+                        },
+                      })
+                    }
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Whole numbers from 1 to {max}.
+                  </p>
+                </div>
+              ))}
             </div>
+            <p className="text-sm text-muted-foreground">
+              Limits count both successful and failed sign-ins. Saving does not
+              reset existing counters. A new window duration applies to the next
+              counter cycle.
+            </p>
           </div>
         </fieldset>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs text-muted-foreground">
+            {dirty ? 'You have unsaved changes.' : 'All changes saved.'}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting || !dirty}
+              onClick={() => {
+                setForm(saved);
+                setMessage('');
+                setError('');
+              }}
+            >
+              Discard changes
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !dirty}
+              className="min-w-32"
+            >
+              {isSubmitting ? 'Saving…' : 'Save settings'}
+            </Button>
+          </div>
+        </div>
       </form>
     </section>
   );

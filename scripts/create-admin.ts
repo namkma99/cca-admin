@@ -16,9 +16,8 @@ async function main() {
   }
   try {
     const result = await withDatabase((db) => createAdmin(db, username.data));
-    // Intentional one-time terminal output. Never persist this password or log it in HTTP.
     console.log(
-      `Admin: ${result.username}\nMật khẩu tạm (chỉ hiển thị lần này): ${result.temporaryPassword}\nĐăng nhập tại /login và đặt mật khẩu chính thức trong bước tiếp theo.`,
+      `Admin: ${result.username}\nNhập username tại /login và đặt mật khẩu trong bước tiếp theo.`,
     );
   } catch {
     // Driver errors may include credentials/connection details: do not print the raw error.

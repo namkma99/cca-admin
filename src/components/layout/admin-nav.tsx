@@ -1,23 +1,28 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, ScrollText, Settings } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Settings2,
+  UsersRound,
+  ScrollText,
+} from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 
-const NAV_ITEMS = [
+const items = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/admin/users', label: 'Users', icon: Users },
+  { href: '/admin/users', label: 'Users', icon: UsersRound },
   { href: '/admin/audit-logs', label: 'Audit logs', icon: ScrollText },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/settings', label: 'Settings', icon: Settings2 },
 ];
 export function AdminNav() {
   const pathname = usePathname();
   return (
     <nav
       aria-label="Admin navigation"
-      className="mb-8 flex gap-1 overflow-x-auto border-b border-border"
+      className="grid grid-cols-4 gap-1 lg:flex lg:flex-col"
     >
-      {NAV_ITEMS.map(({ icon: Icon, ...item }) => {
+      {items.map(({ icon: Icon, ...item }) => {
         const active = item.exact
           ? pathname === item.href
           : pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -27,13 +32,13 @@ export function AdminNav() {
             href={item.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors sm:px-4',
+              'inline-flex flex-col items-center justify-center gap-2 rounded-lg px-1 py-2.5 text-[11px] font-medium sm:text-sm lg:flex-row lg:justify-start lg:gap-2.5 lg:px-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring',
               active
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
             )}
           >
-            <Icon size={16} aria-hidden="true" />
+            <Icon aria-hidden="true" className="size-4" />
             {item.label}
           </Link>
         );
