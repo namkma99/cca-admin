@@ -133,7 +133,7 @@ Không ghi cứng quota vào thiết kế vì nhà cung cấp có thể thay đ�
 - Frontend Pages chỉ nhận `NEXT_PUBLIC_CCA_API_URL`. CORS allowlist origin chính xác, `credentials: include`; hỗ trợ preflight cho method/header cần thiết.
 - Cookie production có HttpOnly, Secure, Path=/ và SameSite phù hợp. Ưu tiên host-only cookie trên API/admin, hai frontend dùng HTTPS cùng domain gốc. Kiểm tra Origin/CSRF cho mutation, kể cả login/logout. Domain production thực tế còn cần chốt.
 - Preview/local dùng database test riêng, không trỏ nhầm production. Không copy dữ liệu có đáp án sang public assets hay bundle client.
-- Mật khẩu tạm chỉ trả lúc cấp/reset; không ghi vào audit/log. Admin đầu tiên tạo qua script riêng, không có đăng ký admin công khai.
+- Cấp/reset tài khoản về pending_password, không sinh mật khẩu. Username đủ để vào bước đặt mật khẩu lần đầu, kể cả admin. Admin đầu tiên tạo qua script riêng, không có đăng ký admin công khai.
 
 ## Thứ tự chuẩn bị triển khai
 

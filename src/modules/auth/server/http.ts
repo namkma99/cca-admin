@@ -72,10 +72,15 @@ export function createAuthHandlers({
         headers.set('Set-Cookie', clearSessionCookie(config));
         return Response.json({ ok: true }, { headers });
       }
+      const requiredRole = origin === config.appOrigin ? 'admin' : undefined;
       const issued = await runWithService((service) =>
         operation === 'login'
-          ? service.login(input, clientIp(request, config.onVercel))
-          : service.setupPassword(token, input),
+          ? service.login(
+              input,
+              clientIp(request, config.onVercel),
+              requiredRole,
+            )
+          : service.setupPassword(token, input, requiredRole),
       );
       if ('token' in issued && issued.token) {
         headers.set(

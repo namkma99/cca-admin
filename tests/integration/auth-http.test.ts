@@ -11,15 +11,13 @@ import { createTestDatabase } from '../helpers/database';
 import { AuthService } from '../../src/modules/auth/server/service';
 import { createAuthHandlers } from '../../src/modules/auth/server/http';
 import { readAuthConfig } from '../../src/server/security/auth-config';
+import { users, authSessions } from '../../src/server/db/schema';
 import { hashPassword } from '../../src/server/security/password';
-import { users } from '../../src/server/db/schema';
 
 let fixture: Awaited<ReturnType<typeof createTestDatabase>>;
 let handlers: ReturnType<typeof createAuthHandlers>;
-let verifier: string;
 const origin = 'https://cca.dev-pro.online';
 const frontend = 'https://dev-pro.online';
-const password = 'temporary-secret-123';
 const config = readAuthConfig({
   NODE_ENV: 'production',
   APP_ORIGIN: origin,
@@ -44,11 +42,10 @@ function cookie(response: Response) {
   return response.headers.get('set-cookie')!.split(';')[0]!;
 }
 async function login() {
-  return handlers.login(request('login', { username: 'admin', password }));
+  return handlers.login(request('login', { username: 'admin' }));
 }
 beforeAll(async () => {
   fixture = await createTestDatabase();
-  verifier = await hashPassword(password);
 }, 30000);
 afterAll(async () => {
   await fixture?.client.close();
@@ -57,7 +54,7 @@ beforeEach(async () => {
   await fixture.client.exec('TRUNCATE users, rate_limits CASCADE');
   await fixture.db
     .insert(users)
-    .values({ username: 'admin', passwordHash: verifier, role: 'admin' });
+    .values({ username: 'admin', passwordHash: null, role: 'admin' });
   handlers = createAuthHandlers({
     config,
     runWithService: async (work) => work(new AuthService(fixture.db)),
@@ -65,6 +62,85 @@ beforeEach(async () => {
 });
 
 describe('auth HTTP boundary', () => {
+  it.each([
+    ['pending_password', undefined],
+    ['active', undefined],
+    ['active', 'student-password-123'],
+  ] as const)(
+    'rejects a %s student on the admin origin without issuing any session',
+    async (status, password) => {
+      await fixture.db.insert(users).values({
+        username: 'student',
+        role: 'student',
+        status,
+        passwordHash:
+          status === 'active'
+            ? await hashPassword('student-password-123')
+            : null,
+      });
+      const response = await handlers.login(
+        request('login', {
+          username: 'student',
+          ...(password ? { password } : {}),
+        }),
+      );
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toMatchObject({
+        code: 'FORBIDDEN',
+        message: 'Trang quản trị chỉ dành cho tài khoản quản trị viên.',
+      });
+      expect(response.headers.get('set-cookie')).toBeNull();
+      expect(await fixture.db.select().from(authSessions)).toHaveLength(0);
+      const student = (await fixture.db.select().from(users)).find(
+        (u) => u.username === 'student',
+      );
+      expect(student?.lastLoginAt).toBeNull();
+    },
+  );
+
+  it('allows student activation and login from the exam frontend, and rejects setup on the admin origin', async () => {
+    await fixture.db.insert(users).values({
+      username: 'student',
+      role: 'student',
+      status: 'pending_password',
+    });
+    const first = await handlers.login(
+      request('login', { username: 'student' }, { Origin: frontend }),
+    );
+    expect(first.status).toBe(200);
+    expect((await first.json()).session.user.role).toBe('student');
+    const input = {
+      password: 'student-password-123',
+      confirmPassword: 'student-password-123',
+    };
+    const rejected = await handlers.setupPassword(
+      request('setup-password', input, { Cookie: cookie(first) }),
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.headers.get('set-cookie')).toBeNull();
+    expect(await fixture.db.select().from(authSessions)).toHaveLength(1);
+    const activated = await handlers.setupPassword(
+      request('setup-password', input, {
+        Origin: frontend,
+        Cookie: cookie(first),
+      }),
+    );
+    expect(activated.status).toBe(200);
+    expect((await activated.json()).session).toMatchObject({
+      kind: 'authenticated',
+      user: { role: 'student' },
+    });
+    const login = await handlers.login(
+      request(
+        'login',
+        { username: 'student', password: input.password },
+        { Origin: frontend },
+      ),
+    );
+    expect(login.status).toBe(200);
+    expect((await login.json()).session.user.role).toBe('student');
+  });
+
   it('sets host-only Secure HttpOnly setup cookie and returns no secret fields', async () => {
     const response = await login();
     expect(response.status).toBe(200);
@@ -126,7 +202,7 @@ describe('auth HTTP boundary', () => {
       expect(response.headers.get('cache-control')).toBe('no-store');
     };
     const first = await handlers.login(
-      request('login', { username: 'admin', password }, { Origin: frontend }),
+      request('login', { username: 'admin' }, { Origin: frontend }),
     );
     expect(first.status).toBe(200);
     assertCors(first);
@@ -171,16 +247,12 @@ describe('auth HTTP boundary', () => {
   it('blocks untrusted/missing/null origins for mutations before accessing DB', async () => {
     for (const badOrigin of ['https://evil.example', 'null']) {
       const response = await handlers.login(
-        request(
-          'login',
-          { username: 'admin', password },
-          { Origin: badOrigin },
-        ),
+        request('login', { username: 'admin' }, { Origin: badOrigin }),
       );
       expect(response.status).toBe(403);
       expect(response.headers.get('access-control-allow-origin')).toBeNull();
     }
-    const req = request('login', { username: 'admin', password });
+    const req = request('login', { username: 'admin' });
     req.headers.delete('origin');
     expect((await handlers.login(req)).status).toBe(403);
     expect(
@@ -244,6 +316,18 @@ describe('auth HTTP boundary', () => {
       request('session', undefined, { Cookie: '__Host-cca_session=%ZZ' }),
     );
     expect((await response.json()).session).toBeNull();
+    const first = await login();
+    const setup = await handlers.setupPassword(
+      request(
+        'setup-password',
+        {
+          password: 'permanent-secret-123',
+          confirmPassword: 'permanent-secret-123',
+        },
+        { Cookie: cookie(first) },
+      ),
+    );
+    expect(setup.status).toBe(200);
     const failure = await handlers.login(
       request('login', { username: 'admin', password: 'wrong' }),
     );

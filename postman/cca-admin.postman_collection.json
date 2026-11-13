@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c8a41703-9e45-4df3-a120-cf9673a38da0",
     "name": "CCA Admin & Exam API",
-    "description": "Postman Collection hoàn chỉnh cho hệ thống CCA Admin & Exam Engine trên Next.js (Vercel & Neon PostgreSQL). Đã tích hợp sẵn header CSRF/Origin, test scripts tự động lưu token và ID.",
+    "description": "Postman Collection hoàn chỉnh cho hệ thống CCA Admin & Exam Engine trên Next.js (Vercel & Neon PostgreSQL). Đã tích hợp sẵn header CSRF/Origin, test scripts tự động lưu token và ID. Domain admin (APP_ORIGIN) chỉ cho admin đăng nhập/setup; các request học viên dùng frontendOrigin, phải có trong CCA_ALLOWED_ORIGINS.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -32,6 +32,11 @@
       "type": "string"
     },
     {
+      "key": "frontendOrigin",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
       "key": "adminUsername",
       "value": "admin_cca",
       "type": "string"
@@ -44,11 +49,6 @@
     {
       "key": "studentUsername",
       "value": "student_test",
-      "type": "string"
-    },
-    {
-      "key": "studentTempPassword",
-      "value": "2hEFM1LPcxg_YyqoJGBBQlWImVN2IoSj",
       "type": "string"
     },
     {
@@ -128,7 +128,7 @@
           }
         },
         {
-          "name": "Login (Student - Temp Password)",
+          "name": "Login (Student - First Setup)",
           "event": [
             {
               "listen": "test",
@@ -157,19 +157,19 @@
               },
               {
                 "key": "Origin",
-                "value": "{{baseUrl}}"
+                "value": "{{frontendOrigin}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{studentUsername}}\",\n  \"password\": \"{{studentTempPassword}}\"\n}"
+              "raw": "{\n  \"username\": \"{{studentUsername}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Đăng nhập học viên lần đầu với mật khẩu tạm thời do Admin cấp. Trả về phiên ngắn hạn password_setup (10 phút) để chuyển hướng sang đổi mật khẩu."
+            "description": "Đăng nhập học viên lần đầu chỉ bằng username do Admin cấp. Trả về phiên ngắn hạn password_setup (10 phút) để chuyển hướng sang đổi mật khẩu."
           }
         },
         {
@@ -202,7 +202,7 @@
               },
               {
                 "key": "Origin",
-                "value": "{{baseUrl}}"
+                "value": "{{frontendOrigin}}"
               }
             ],
             "body": {
@@ -278,7 +278,7 @@
               },
               {
                 "key": "Origin",
-                "value": "{{baseUrl}}"
+                "value": "{{frontendOrigin}}"
               }
             ],
             "body": {
@@ -290,7 +290,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "setup-password"]
             },
-            "description": "Kích hoạt tài khoản và đặt mật khẩu chính thức trong phiên password_setup (10 phút). Yêu cầu mật khẩu từ 12-128 ký tự và khác mật khẩu tạm."
+            "description": "Kích hoạt tài khoản và đặt mật khẩu chính thức trong phiên password_setup (10 phút). Yêu cầu mật khẩu từ 12-128 ký tự và xác nhận trùng khớp."
           }
         },
         {
@@ -392,11 +392,6 @@
                   "if (data.user && data.user.id) {",
                   "    pm.environment.set(\"userId\", data.user.id);",
                   "    pm.collectionVariables.set(\"userId\", data.user.id);",
-                  "}",
-                  "if (data.temporaryPassword) {",
-                  "    pm.environment.set(\"studentTempPassword\", data.temporaryPassword);",
-                  "    pm.collectionVariables.set(\"studentTempPassword\", data.temporaryPassword);",
-                  "    console.log(\"Mật khẩu tạm của học viên mới:\", data.temporaryPassword);",
                   "}"
                 ]
               }
@@ -423,7 +418,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "admin", "users"]
             },
-            "description": "Tạo tài khoản học viên mới với trạng thái pending_password và sinh mật khẩu tạm thời ngẫu nhiên (chỉ trả về 1 lần duy nhất)."
+            "description": "Tạo tài khoản học viên mới với trạng thái pending_password, không cấp mật khẩu. Học viên nhập username rồi tự đặt mật khẩu."
           }
         },
         {
@@ -502,12 +497,7 @@
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "var data = pm.response.json();",
-                  "if (data.temporaryPassword) {",
-                  "    pm.environment.set(\"studentTempPassword\", data.temporaryPassword);",
-                  "    pm.collectionVariables.set(\"studentTempPassword\", data.temporaryPassword);",
-                  "    console.log(\"Mật khẩu tạm thời mới:\", data.temporaryPassword);",
-                  "}"
+                  "var data = pm.response.json();"
                 ]
               }
             }
@@ -540,7 +530,7 @@
                 "reset-password"
               ]
             },
-            "description": "Đặt lại mật khẩu cho học viên. Sinh mật khẩu tạm mới, chuyển trạng thái về pending_password và thu hồi tất cả phiên cũ."
+            "description": "Đặt lại mật khẩu cho học viên. Xóa hash mật khẩu, chuyển trạng thái về pending_password và thu hồi tất cả phiên cũ. Học viên nhập username rồi đặt mật khẩu mới."
           }
         },
         {
