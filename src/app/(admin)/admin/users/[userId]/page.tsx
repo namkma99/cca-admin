@@ -1,3 +1,5 @@
+import { AppError } from '@/server/http/errors';
+import { z } from 'zod';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { requirePageSession } from '@/modules/auth/server/page-session';
@@ -12,13 +14,17 @@ export default async function AdminUserDetailPage({
 }) {
   const session = await requirePageSession('admin');
   const { userId } = await params;
+  if (!z.uuid().safeParse(userId).success) notFound();
   const cookieName =
     process.env.NODE_ENV === 'production'
       ? '__Host-cca_session'
       : 'cca_session';
   const token = (await cookies()).get(cookieName)?.value ?? null;
   const detail = await withDatabase((db) =>
-    new UserService(db).get(token, userId).catch(() => null),
+    new UserService(db).get(token, userId).catch((error: unknown) => {
+      if (error instanceof AppError && error.status === 404) return null;
+      throw error;
+    }),
   );
   if (!detail) notFound();
   return (

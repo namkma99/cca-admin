@@ -1,5 +1,7 @@
 import 'server-only';
-import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { auditFiltersSchema, type AuditPage } from '../contracts/audit';
 import { z } from 'zod';
 import { adminAuditLogs, authSessions, users } from '@/server/db/schema';
 import {
@@ -151,12 +153,19 @@ export class UserService {
       const [user] = await tx.select().from(users).where(eq(users.id, id));
       if (!user) throw fail('NOT_FOUND', 404, 'Không tìm thấy tài khoản.');
       const logs = await tx
-        .select()
+        .select({ log: adminAuditLogs, actorUsername: users.username })
         .from(adminAuditLogs)
+        .innerJoin(users, eq(adminAuditLogs.actorUserId, users.id))
         .where(eq(adminAuditLogs.targetUserId, id))
         .orderBy(desc(adminAuditLogs.createdAt))
         .limit(50);
-      return { user: safeUser(user), recentAudit: logs.map(safeAudit) };
+      return {
+        user: safeUser(user),
+        recentAudit: logs.map(({ log, actorUsername }) => ({
+          ...safeAudit(log),
+          actorUsername,
+        })),
+      };
     });
   }
 
@@ -336,6 +345,57 @@ export class UserService {
     });
   }
 
+  async listAudit(
+    token: string | null,
+    input: unknown = {},
+  ): Promise<AuditPage> {
+    const parsed = auditFiltersSchema.safeParse(input);
+    if (!parsed.success)
+      throw fail('INVALID_INPUT', 400, 'Invalid audit log filters.');
+    const { query, action, page, pageSize } = parsed.data;
+    return this.db.transaction(async (tx) => {
+      await this.actor(tx, token);
+      const actor = alias(users, 'audit_actor');
+      const target = alias(users, 'audit_target');
+      const pattern = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
+      const filter = and(
+        action ? eq(adminAuditLogs.action, action) : undefined,
+        query
+          ? or(ilike(actor.username, pattern), ilike(target.username, pattern))
+          : undefined,
+      );
+      const [count] = await tx
+        .select({ total: sql<number>`count(*)::int` })
+        .from(adminAuditLogs)
+        .innerJoin(actor, eq(adminAuditLogs.actorUserId, actor.id))
+        .innerJoin(target, eq(adminAuditLogs.targetUserId, target.id))
+        .where(filter);
+      const rows = await tx
+        .select({
+          log: adminAuditLogs,
+          actorUsername: actor.username,
+          targetUsername: target.username,
+        })
+        .from(adminAuditLogs)
+        .innerJoin(actor, eq(adminAuditLogs.actorUserId, actor.id))
+        .innerJoin(target, eq(adminAuditLogs.targetUserId, target.id))
+        .where(filter)
+        .orderBy(desc(adminAuditLogs.createdAt), desc(adminAuditLogs.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+      return {
+        logs: rows.map(({ log, actorUsername, targetUsername }) => ({
+          ...safeAudit(log),
+          actorUsername,
+          targetUsername,
+        })),
+        total: Number(count?.total ?? 0),
+        page,
+        pageSize,
+      };
+    });
+  }
+
   async audit(token: string | null, id: string) {
     return this.db.transaction(async (tx) => {
       await this.actor(tx, token);
@@ -345,12 +405,18 @@ export class UserService {
         .where(eq(users.id, id));
       if (!target) throw fail('NOT_FOUND', 404, 'Không tìm thấy tài khoản.');
       const logs = await tx
-        .select()
+        .select({ log: adminAuditLogs, actorUsername: users.username })
         .from(adminAuditLogs)
+        .innerJoin(users, eq(adminAuditLogs.actorUserId, users.id))
         .where(eq(adminAuditLogs.targetUserId, id))
         .orderBy(desc(adminAuditLogs.createdAt))
         .limit(100);
-      return { logs: logs.map(safeAudit) };
+      return {
+        logs: logs.map(({ log, actorUsername }) => ({
+          ...safeAudit(log),
+          actorUsername,
+        })),
+      };
     });
   }
 }

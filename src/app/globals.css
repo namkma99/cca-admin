@@ -42,3 +42,32 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+.admin-shell th {
+  padding: 0.75rem;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.admin-shell td {
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.admin-shell tbody tr:last-child td {
+  border-bottom: 0;
+}
+.admin-shell tbody tr:hover {
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+}
+.admin-shell a:focus-visible,
+.admin-shell summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: 0.25rem;
+}
+button:not(:disabled),
+summary {
+  cursor: pointer;
+}

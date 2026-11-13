@@ -37,7 +37,7 @@ describe('auth forms', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), ' Admin ');
-    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith('/setup-password'),
     );
@@ -76,12 +76,12 @@ describe('auth forms', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), 'admin');
-    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
-    expect(await screen.findByLabelText('Mật khẩu')).toBeVisible();
-    await user.type(screen.getByLabelText('Mật khẩu'), 'correct-password');
-    await user.click(screen.getByRole('button', { name: 'Hiện mật khẩu' }));
-    expect(screen.getByLabelText('Mật khẩu')).toHaveAttribute('type', 'text');
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByLabelText('Password')).toBeVisible();
+    await user.type(screen.getByLabelText('Password'), 'correct-password');
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/admin'));
   });
 
@@ -94,7 +94,7 @@ describe('auth forms', () => {
           {
             error: {
               code: 'INVALID_CREDENTIALS',
-              message: 'Username hoặc mật khẩu không chính xác.',
+              message: 'Incorrect username or password.',
             },
           },
           { status: 401 },
@@ -103,11 +103,11 @@ describe('auth forms', () => {
     );
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), 'admin');
-    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Username hoặc mật khẩu không chính xác.',
+      'Incorrect username or password.',
     );
-    expect(screen.getByRole('button', { name: 'Tiếp tục' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 
   it('prevents mismatched setup passwords from reaching the API', async () => {
@@ -116,17 +116,15 @@ describe('auth forms', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<AuthForm mode="setup" />);
     await user.type(
-      screen.getByLabelText('Mật khẩu mới'),
+      screen.getByLabelText('New password'),
       'permanent-password-123',
     );
     await user.type(
-      screen.getByLabelText('Xác nhận mật khẩu'),
+      screen.getByLabelText('Confirm password'),
       'different-password-123',
     );
-    await user.click(screen.getByRole('button', { name: 'Đặt mật khẩu' }));
-    expect(
-      await screen.findByText('Xác nhận mật khẩu chưa khớp.'),
-    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Set password' }));
+    expect(await screen.findByText('Passwords do not match.')).toBeVisible();
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -148,14 +146,14 @@ describe('auth forms', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<AuthForm mode="setup" />);
     await user.type(
-      screen.getByLabelText('Mật khẩu mới'),
+      screen.getByLabelText('New password'),
       'permanent-password-123',
     );
     await user.type(
-      screen.getByLabelText('Xác nhận mật khẩu'),
+      screen.getByLabelText('Confirm password'),
       'permanent-password-123',
     );
-    await user.click(screen.getByRole('button', { name: 'Đặt mật khẩu' }));
+    await user.click(screen.getByRole('button', { name: 'Set password' }));
     await waitFor(() =>
       expect(router.replace).toHaveBeenCalledWith('/account'),
     );
@@ -178,16 +176,16 @@ describe('auth forms', () => {
     );
     render(<AuthForm mode="login" />);
     await user.type(screen.getByLabelText('Username'), 'admin');
-    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(
-      await screen.findByRole('button', { name: 'Đang kiểm tra…' }),
+      await screen.findByRole('button', { name: 'Checking…' }),
     ).toBeDisabled();
     fail(new Error('Network unavailable'));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Network unavailable',
+      'Unable to connect. Check your connection and try again.',
     );
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Tiếp tục' })).toBeEnabled(),
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled(),
     );
     expect(router.replace).not.toHaveBeenCalled();
   });

@@ -1,45 +1,68 @@
 import Link from 'next/link';
+import { Users, Settings, ScrollText, ArrowUpRight } from 'lucide-react';
 import { requirePageSession } from '@/modules/auth/server/page-session';
 
+const tools = [
+  {
+    title: 'User management',
+    description:
+      'Create student accounts, manage access and review exam results.',
+    href: '/admin/users',
+    icon: Users,
+    action: 'Manage users',
+  },
+  {
+    title: 'Audit logs',
+    description:
+      'Review account changes, password resets and exam cycle resets across all users.',
+    href: '/admin/audit-logs',
+    icon: ScrollText,
+    action: 'View audit logs',
+  },
+  {
+    title: 'System settings',
+    description:
+      'Configure exam duration, forms per cycle and system preferences.',
+    href: '/admin/settings',
+    icon: Settings,
+    action: 'Manage settings',
+  },
+];
 export default async function AdminPage() {
-  await requirePageSession('admin');
+  const session = await requirePageSession('admin');
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold">Quản trị hệ thống CCA</h1>
+        <p className="text-sm font-medium text-primary">Administration</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Overview</h1>
         <p className="mt-2 text-muted-foreground">
-          Bảng điều khiển quản trị viên và các công cụ quản lý.
+          Welcome, {session.user.username}. Manage your CCA exam portal.
         </p>
       </div>
-
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="rounded-lg border border-border p-6 shadow-xs space-y-4">
-          <h2 className="text-xl font-semibold">Quản lý người dùng</h2>
-          <p className="text-sm text-muted-foreground">
-            Tạo tài khoản học viên, quản lý danh sách, khóa/mở khóa tài khoản và
-            đặt lại mật khẩu.
-          </p>
+      <div className="grid gap-5 md:grid-cols-3">
+        {tools.map(({ icon: Icon, ...tool }) => (
           <Link
-            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            href="/admin/users"
+            key={tool.href}
+            href={tool.href}
+            className="group flex flex-col rounded-xl border border-border bg-background p-6 shadow-xs transition-colors hover:border-primary"
           >
-            Quản lý người dùng →
+            <span className="mb-5 inline-flex w-fit rounded-lg bg-primary/10 p-3 text-primary">
+              <Icon size={24} aria-hidden="true" />
+            </span>
+            <h2 className="text-lg font-semibold">{tool.title}</h2>
+            <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+              {tool.description}
+            </p>
+            <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary">
+              {tool.action}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </span>
           </Link>
-        </div>
-
-        <div className="rounded-lg border border-border p-6 shadow-xs space-y-4">
-          <h2 className="text-xl font-semibold">Cài đặt hệ thống</h2>
-          <p className="text-sm text-muted-foreground">
-            Cấu hình thời gian thi, số lượng đề ngẫu nhiên, điểm chuẩn đạt và
-            tùy chọn hiển thị.
-          </p>
-          <Link
-            className="inline-flex rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
-            href="/admin/settings"
-          >
-            Cài đặt hệ thống →
-          </Link>
-        </div>
+        ))}
+      </div>
+      <div className="rounded-xl border border-border bg-muted/30 p-5 text-sm text-muted-foreground">
+        Start with Users to create a student account. Each student sets their
+        own password when they first sign in.
       </div>
     </div>
   );

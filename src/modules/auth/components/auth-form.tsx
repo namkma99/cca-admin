@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { requestJson } from '@/shared/http/request-json';
 import { Button } from '@/components/ui/button';
 import {
   setupPasswordSchema,
@@ -17,7 +18,7 @@ import { authDestination } from '../contracts/navigation';
 
 const inputClass =
   'mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const fallback = 'Không thể kết nối. Vui lòng thử lại.';
+const fallback = 'Unable to connect. Please try again.';
 
 function PasswordField({
   label,
@@ -57,11 +58,11 @@ function PasswordField({
         <button
           type="button"
           onClick={() => setVisible(!visible)}
-          aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          aria-label={visible ? 'Hide password' : 'Show password'}
           aria-pressed={visible}
           className="absolute right-3 top-5 text-sm text-primary focus-visible:outline-2 focus-visible:outline-ring"
         >
-          {visible ? 'Ẩn' : 'Hiện'}
+          {visible ? 'Hide' : 'Show'}
         </button>
       </div>
       {error && (
@@ -77,40 +78,22 @@ function PasswordField({
 }
 
 async function postLogin(input: LoginInput): Promise<LoginResponse> {
-  const response = await fetch('/api/v1/auth/login', {
+  const body = await requestJson<unknown>('/api/v1/auth/login', {
     method: 'POST',
-    credentials: 'include',
-    cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const error = body as { error?: { message?: string } };
-    throw new Error(
-      typeof error.error?.message === 'string' ? error.error.message : fallback,
-    );
-  }
   const parsed = loginResponseSchema.safeParse(body);
   if (!parsed.success) throw new Error(fallback);
   return parsed.data;
 }
 
 async function postSetup(input: SetupPasswordInput) {
-  const response = await fetch('/api/v1/auth/setup-password', {
+  const body = await requestJson<unknown>('/api/v1/auth/setup-password', {
     method: 'POST',
-    credentials: 'include',
-    cache: 'no-store',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const error = body as { error?: { message?: string } };
-    throw new Error(
-      typeof error.error?.message === 'string' ? error.error.message : fallback,
-    );
-  }
   const parsed = sessionResponseSchema.safeParse(body);
   if (!parsed.success || !parsed.data.session) throw new Error(fallback);
   return parsed.data.session;
@@ -139,7 +122,7 @@ function LoginForm() {
     e.preventDefault();
     const cleanUsername = username.trim().toLowerCase();
     if (!cleanUsername) {
-      setError('Vui lòng kiểm tra username.');
+      setError('Please check your username.');
       return;
     }
     setError('');
@@ -163,7 +146,7 @@ function LoginForm() {
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!password) {
-      setError('Vui lòng nhập mật khẩu.');
+      setError('Please enter your password.');
       return;
     }
     setError('');
@@ -200,19 +183,19 @@ function LoginForm() {
             }}
             className="text-xs font-semibold text-primary underline focus-visible:outline-2 focus-visible:outline-ring"
           >
-            Thay đổi
+            Change
           </button>
         </div>
         <PasswordField
           id="password"
-          label="Mật khẩu"
+          label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
         />
         <FormError>{error}</FormError>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
+          {isSubmitting ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
     );
@@ -245,7 +228,7 @@ function LoginForm() {
       </div>
       <FormError>{error}</FormError>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? 'Đang kiểm tra…' : 'Tiếp tục'}
+        {isSubmitting ? 'Checking…' : 'Continue'}
       </Button>
     </form>
   );
@@ -280,21 +263,21 @@ function SetupForm() {
     >
       <PasswordField
         id="new-password"
-        label="Mật khẩu mới"
+        label="New password"
         registration={register('password')}
         autoComplete="new-password"
         error={errors.password?.message}
       />
       <PasswordField
         id="confirm-password"
-        label="Xác nhận mật khẩu"
+        label="Confirm password"
         registration={register('confirmPassword')}
         autoComplete="new-password"
         error={errors.confirmPassword?.message}
       />
       <FormError>{error}</FormError>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? 'Đang lưu…' : 'Đặt mật khẩu'}
+        {isSubmitting ? 'Saving…' : 'Set password'}
       </Button>
     </form>
   );

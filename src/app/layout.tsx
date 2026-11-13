@@ -4,13 +4,13 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: { default: 'CCA Admin', template: '%s | CCA Admin' },
-  description: 'Quản lý tài khoản và phòng thi CCA.',
+  description: 'Manage CCA accounts and exam settings.',
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="vi">
+    <html lang="en">
       <body className="min-h-dvh font-sans antialiased">{children}</body>
     </html>
   );

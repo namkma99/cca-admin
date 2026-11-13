@@ -9,9 +9,9 @@ export default async function LoginPage() {
   return (
     <>
       <p className="text-sm font-semibold text-primary">CCA</p>
-      <h1 className="mt-3 text-2xl font-semibold">Đăng nhập</h1>
+      <h1 className="mt-3 text-2xl font-semibold">Sign in</h1>
       <p className="mb-7 mt-3 text-sm leading-relaxed text-muted-foreground">
-        Sử dụng tài khoản do quản trị viên cấp để tiếp tục.
+        Use the account provided by your administrator to continue.
       </p>
       <AuthForm mode="login" />
     </>

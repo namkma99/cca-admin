@@ -12,18 +12,15 @@ export default async function AdminUsersPage() {
       : 'cca_session';
   const token = (await cookies()).get(cookieName)?.value ?? null;
   const initialUsers = await withDatabase((db) =>
-    new UserService(db)
-      .list(token, '')
-      .then((r) => r.users)
-      .catch(() => []),
+    new UserService(db).list(token, '').then((r) => r.users),
   );
 
   return (
     <section className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold">Người dùng</h1>
+        <h1 className="text-3xl font-semibold">Users</h1>
         <p className="mt-2 text-muted-foreground">
-          Tạo tài khoản học viên, quản lý danh sách và khóa/mở khóa tài khoản.
+          Create student accounts, review activity and manage account access.
         </p>
       </div>
       <UsersPanel initialUsers={initialUsers} />

@@ -11,10 +11,10 @@ export default async function SetupPasswordPage() {
   return (
     <>
       <p className="text-sm font-semibold text-primary">CCA</p>
-      <h1 className="mt-3 text-2xl font-semibold">Đặt mật khẩu của bạn</h1>
+      <h1 className="mt-3 text-2xl font-semibold">Set your password</h1>
       <p className="mb-7 mt-3 text-sm leading-relaxed text-muted-foreground">
-        Xin chào {session.user.username}. Vui lòng tạo mật khẩu cho tài khoản
-        của bạn (từ 12 đến 128 ký tự) để sử dụng cho các lần đăng nhập sau.
+        Welcome, {session.user.username}. Create a password between 12 and 128
+        characters for future sign-ins.
       </p>
       <AuthForm mode="setup" />
       <div className="mt-6">

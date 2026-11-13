@@ -22,14 +22,14 @@ export function LogoutButton() {
       router.replace('/login');
       router.refresh();
     } catch {
-      setError('Chưa thể đăng xuất. Vui lòng thử lại.');
+      setError('Unable to sign out. Please try again.');
       setPending(false);
     }
   }
   return (
     <div className="space-y-2">
       <Button variant="outline" onClick={logout} disabled={pending}>
-        {pending ? 'Đang đăng xuất…' : 'Đăng xuất'}
+        {pending ? 'Signing out…' : 'Sign out'}
       </Button>
       {error && (
         <p role="alert" className="text-sm text-red-700 dark:text-red-300">

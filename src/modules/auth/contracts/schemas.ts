@@ -8,7 +8,7 @@ export const usernameSchema = z
   .max(64)
   .regex(
     /^[a-z0-9][a-z0-9._-]*$/,
-    'Username chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.',
+    'Use letters, numbers, periods, underscores or hyphens.',
   );
 export const loginSchema = z
   .object({
@@ -18,13 +18,16 @@ export const loginSchema = z
   .strict();
 export const setupPasswordSchema = z
   .object({
-    password: z.string().min(12, 'Mật khẩu cần ít nhất 12 ký tự.').max(128),
+    password: z
+      .string()
+      .min(12, 'Password must contain at least 12 characters.')
+      .max(128),
     confirmPassword: z.string().min(1).max(128),
   })
   .strict()
   .refine((value) => value.password === value.confirmPassword, {
     path: ['confirmPassword'],
-    message: 'Xác nhận mật khẩu chưa khớp.',
+    message: 'Passwords do not match.',
   });
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SetupPasswordInput = z.infer<typeof setupPasswordSchema>;

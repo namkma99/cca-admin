@@ -45,6 +45,58 @@ beforeEach(async () => {
 });
 
 describe('UserService', () => {
+  it('lists global audit events with actor and target, filters and paginates', async () => {
+    const alice = await service.create(token, { username: 'alice' });
+    await service.create(token, { username: 'bob' });
+    await service.setStatus(token, alice.user.id, { disabled: true });
+    const first = await service.listAudit(token, { page: 1, pageSize: 2 });
+    expect(first.logs).toHaveLength(2);
+    expect(first.total).toBe(3);
+    expect(first.logs[0]).toMatchObject({ actorUsername: 'admin' });
+    expect(first.logs[0]).not.toHaveProperty('passwordHash');
+    const second = await service.listAudit(token, { page: 2, pageSize: 2 });
+    expect(second.logs).toHaveLength(1);
+    expect(
+      new Set([...first.logs, ...second.logs].map((log) => log.id)).size,
+    ).toBe(3);
+    const filtered = await service.listAudit(token, {
+      query: 'alice',
+      action: 'disable_user',
+    });
+    expect(filtered.total).toBe(1);
+    expect(filtered.logs[0]).toMatchObject({
+      targetUsername: 'alice',
+      action: 'disable_user',
+      metadata: { to: 'disabled' },
+    });
+    expect((await service.listAudit(token, { query: 'missing' })).logs).toEqual(
+      [],
+    );
+  });
+
+  it('protects global audit logs and validates pagination and filters', async () => {
+    await expect(service.listAudit(null)).rejects.toMatchObject({
+      code: 'UNAUTHENTICATED',
+    });
+    for (const input of [
+      { page: 0 },
+      { pageSize: 101 },
+      { action: 'unknown' },
+    ]) {
+      await expect(service.listAudit(token, input)).rejects.toMatchObject({
+        code: 'INVALID_INPUT',
+      });
+    }
+    await service.create(token, { username: 'pending-audit' });
+    const setup = await new AuthService(fixture.db, { now: () => now }).login(
+      { username: 'pending-audit' },
+      '127.0.0.1',
+    );
+    await expect(
+      service.listAudit('token' in setup ? setup.token : ''),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
   it('rejects malformed input and duplicate usernames with safe application errors', async () => {
     await expect(
       service.create(token, { username: 'bad space' }),
@@ -119,6 +171,12 @@ describe('UserService', () => {
       .where(eq(users.username, 'new.student'));
     expect(stored?.passwordHash).toBeNull();
     expect(await fixture.db.select().from(adminAuditLogs)).toHaveLength(1);
+    expect(
+      (await service.get(token, result.user.id)).recentAudit[0],
+    ).toMatchObject({ actorUsername: 'admin' });
+    expect((await service.audit(token, result.user.id)).logs[0]).toMatchObject({
+      actorUsername: 'admin',
+    });
   });
 
   it('disables a user, revokes all sessions, and writes an audit event', async () => {

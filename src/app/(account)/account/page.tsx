@@ -7,12 +7,12 @@ export default async function AccountPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-6 py-16">
       <h1 className="text-3xl font-semibold">
-        Xin chào, {session.user.username}
+        Welcome, {session.user.username}
       </h1>
-      <p className="text-muted-foreground">Bạn đã đăng nhập thành công.</p>
+      <p className="text-muted-foreground">You are signed in.</p>
       {session.user.role === 'admin' && (
         <Link href="/admin" className="text-primary underline">
-          Mở trang quản trị
+          Open administration
         </Link>
       )}
       <LogoutButton />
