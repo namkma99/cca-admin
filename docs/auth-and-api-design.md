@@ -17,17 +17,17 @@ Chi tiết endpoint, env, rate limit và cách cấp admin: [auth-implementation
 
 ## Luồng kích hoạt lần đầu đã triển khai
 
-Admin cấp trước username và mật khẩu tạm ngẫu nhiên riêng cho từng người. Database chỉ lưu hash. Người dùng đăng nhập đúng mật khẩu tạm mới được chuyển sang bước đặt mật khẩu chính thức.
+Admin cấp trước username. Tài khoản pending_password chỉ cần username để vào bước đặt mật khẩu; không sinh hoặc kiểm tra mật khẩu tạm. Quy tắc này áp dụng cả admin và tài khoản vừa reset: ai biết username có thể kích hoạt trước chủ tài khoản.
 
-1. User ở trạng thái `pending_password` nhập username và mật khẩu tạm.
+1. User ở trạng thái `pending_password` nhập username.
 2. API kiểm tra thông tin và cấp phiên ngắn loại `password_setup`, 10 phút. Phiên này không được lấy câu hỏi hoặc gọi API admin.
 3. UI hiển thị mật khẩu mới và xác nhận mật khẩu.
 4. API cập nhật hash và trạng thái trong transaction, thu hồi phiên ngắn, cấp mã phiên mới có hiệu lực 24 giờ.
 5. Các lần đăng nhập sau dùng mật khẩu chính thức.
 
-Không cho phép chỉ nhập một username chưa từng đăng nhập rồi tự đặt mật khẩu. Không sử dụng `last_login_at IS NULL` thay cho bằng chứng sở hữu tài khoản.
+Trạng thái `pending_password` quyết định quyền vào bước đặt mật khẩu; không dùng `last_login_at IS NULL`. Tài khoản active vẫn phải nhập đúng mật khẩu đã đặt.
 
-Nếu cần khôi phục mật khẩu khi không có OTP/email, đề xuất admin cấp lại mật khẩu tạm và thu hồi các phiên cũ. Phương án này cùng quyền reset lượt thi cần được chốt trước khi thực hiện.
+Khi admin reset mật khẩu, xóa hash, chuyển tài khoản về pending_password và thu hồi các phiên cũ. Người dùng nhập username rồi đặt mật khẩu mới.
 
 ## Database đã chốt: 8 bảng
 
@@ -48,7 +48,7 @@ Không thêm `question_bank_versions` ở bản đầu. Ngân hàng cố định
 
 - Trước khi hiển thị danh sách đề, gọi API kiểm tra phiên và hiển thị trạng thái chờ, tránh chớp nội dung đã đăng nhập.
 - Chưa có phiên: khung username/password đồng bộ UI hiện tại, hỗ trợ sáng/tối, điện thoại, hiện/ẩn mật khẩu và trạng thái lỗi/chờ.
-- Chờ đặt mật khẩu: khung riêng nhập mật khẩu mới và xác nhận. Chỉ mở sau khi xác thực mật khẩu tạm.
+- Chờ đặt mật khẩu: khung riêng nhập mật khẩu mới và xác nhận. Chỉ mở khi đã có phiên password_setup từ username đang pending_password.
 - Đã đăng nhập: hiển thị ba chủ đề, lượt còn lại và kết quả tổng hợp.
 - Các trang ngoài CCA không bị chuyển đến đăng nhập.
 - Không có đăng ký công khai. Cách cấp quyền truy cập là admin tạo user.
@@ -61,9 +61,9 @@ Người dùng yêu cầu bổ sung màn hình admin quản lý user trên Verce
 
 - Đăng nhập bằng tài khoản có role admin.
 - Danh sách và tìm kiếm user, trạng thái và thời điểm đăng nhập.
-- Cấp user kèm mật khẩu tạm, không hiển thị password_hash.
+- Cấp username ở trạng thái pending_password, không hiển thị password_hash.
 - Khóa/mở quyền truy cập và thu hồi phiên.
-- Cấp lại mật khẩu tạm khi cần khôi phục tài khoản.
+- Reset về pending_password khi cần khôi phục tài khoản.
 
 Đã chốt lưu lịch sử thao tác trong `admin_audit_logs`; chưa bao gồm màn hình tra cứu log. Quyền sửa username, đổi role và reset lượt thi cần được xác nhận. Chưa mặc định xây thêm quản lý câu hỏi, báo cáo hoặc dashboard thống kê. Tài khoản admin đầu tiên có thể cấp bằng script riêng, không có endpoint đăng ký admin công khai.
 
@@ -80,7 +80,7 @@ Người dùng yêu cầu bổ sung màn hình admin quản lý user trên Verce
 
 ## Kế hoạch chuyển đổi
 
-1. Chốt cấp mật khẩu tạm lần đầu, quyền admin, reset và hành vi phiên hết hạn.
+1. Cấp username lần đầu, quyền admin, reset và hành vi phiên hết hạn.
 2. Tạo cấu trúc project Vercel có API và UI admin, tách khỏi static export của next-pro.
 3. Tạo migration Neon và công cụ cấp admin/user ban đầu; import câu hỏi từ data/question-bank.json, kiểm tra số lượng và đáp án.
 4. Chuyển lớp lưu trữ SQLite sang PostgreSQL, bảo vệ giao dịch và ràng buộc đồng thời.

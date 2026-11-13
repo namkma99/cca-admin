@@ -5,28 +5,29 @@ import { UserService } from '@/modules/users/server/service';
 import { withDatabase } from '@/server/db/client';
 
 export default async function AdminUsersPage() {
-  await requirePageSession('admin');
+  const session = await requirePageSession('admin');
   const cookieName =
     process.env.NODE_ENV === 'production'
       ? '__Host-cca_session'
       : 'cca_session';
   const token = (await cookies()).get(cookieName)?.value ?? null;
   const initialUsers = await withDatabase((db) =>
-    new UserService(db)
-      .list(token, '')
-      .then((r) => r.users)
-      .catch(() => []),
+    new UserService(db).list(token, '').then((r) => r.users),
   );
 
   return (
-    <section className="space-y-8">
+    <section className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Người dùng</h1>
-        <p className="mt-2 text-muted-foreground">
-          Tạo tài khoản học viên, quản lý danh sách và khóa/mở khóa tài khoản.
+        <h1 className="text-3xl font-semibold tracking-tight">Người dùng</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Quản lý vai trò, trạng thái truy cập và lịch sử thi của từng tài
+          khoản.
         </p>
       </div>
-      <UsersPanel initialUsers={initialUsers} />
+      <UsersPanel
+        initialUsers={initialUsers}
+        currentAdminId={session.user.id}
+      />
     </section>
   );
 }

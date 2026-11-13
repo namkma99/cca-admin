@@ -259,6 +259,7 @@ describe('auth settings', () => {
       config: readAuthConfig({
         NODE_ENV: 'test',
         APP_ORIGIN: 'http://localhost:3001',
+        CCA_ALLOWED_ORIGINS: 'http://localhost:3002',
       }),
       runWithService: async (work) => work(new AuthService(fixture.db)),
     });
@@ -266,7 +267,7 @@ describe('auth settings', () => {
       new Request('http://localhost:3001/api/v1/auth/login', {
         method: 'POST',
         headers: {
-          Origin: 'http://localhost:3001',
+          Origin: 'http://localhost:3002',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username: 'pending' }),
@@ -280,6 +281,52 @@ describe('auth settings', () => {
       119,
     );
     expect(Number(denied.headers.get('retry-after'))).toBeLessThanOrEqual(120);
+  });
+
+  it('preserves admin portal restrictions while issuing configured setup and authenticated cookies', async () => {
+    await service.update(actorId, {
+      auth: { sessionDurationMinutes: 20, passwordSetupDurationMinutes: 4 },
+    });
+    const handlers = createAuthHandlers({
+      config: readAuthConfig({
+        NODE_ENV: 'test',
+        APP_ORIGIN: 'http://localhost:3001',
+        CCA_ALLOWED_ORIGINS: 'http://localhost:3002',
+      }),
+      runWithService: async (work) => work(new AuthService(fixture.db)),
+    });
+    const req = (origin: string, body: unknown, cookie?: string) =>
+      new Request('http://localhost:3001/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          Origin: origin,
+          'Content-Type': 'application/json',
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    const blockedLogin = await handlers.login(
+      req('http://localhost:3001', { username: 'pending' }),
+    );
+    expect(blockedLogin.status).toBe(403);
+    expect(blockedLogin.headers.get('set-cookie')).toBeNull();
+    const setup = await handlers.login(
+      req('http://localhost:3002', { username: 'pending' }),
+    );
+    expect(setup.status).toBe(200);
+    expect(setup.headers.get('set-cookie')).toContain('Max-Age=240');
+    const cookie = setup.headers.get('set-cookie')!.split(';')[0]!;
+    const input = { password, confirmPassword: password };
+    const blockedSetup = await handlers.setupPassword(
+      req('http://localhost:3001', input, cookie),
+    );
+    expect(blockedSetup.status).toBe(403);
+    expect(blockedSetup.headers.get('set-cookie')).toBeNull();
+    const active = await handlers.setupPassword(
+      req('http://localhost:3002', input, cookie),
+    );
+    expect(active.status).toBe(200);
+    expect(active.headers.get('set-cookie')).toContain('Max-Age=1200');
   });
 
   it('seeds defaults through the migration without overwriting an existing policy', async () => {

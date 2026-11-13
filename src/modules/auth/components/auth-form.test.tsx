@@ -164,6 +164,33 @@ describe('auth forms', () => {
       confirmPassword: 'permanent-password-123',
     });
   });
+  it('shows the admin-only login error without navigating or asking for a password', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              code: 'FORBIDDEN',
+              message: 'Trang quản trị chỉ dành cho tài khoản quản trị viên.',
+            },
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    render(<AuthForm mode="login" />);
+    await user.type(screen.getByLabelText('Username'), 'student');
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Trang quản trị chỉ dành cho tài khoản quản trị viên.',
+    );
+    expect(screen.queryByLabelText('Mật khẩu')).not.toBeInTheDocument();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Tiếp tục' })).toBeEnabled();
+  });
+
   it('disables submit while a request is pending and recovers after network failure', async () => {
     const user = userEvent.setup();
     let fail!: (error: Error) => void;

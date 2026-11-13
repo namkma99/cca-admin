@@ -11,12 +11,12 @@ let fixture: Awaited<ReturnType<typeof createTestDatabase>>;
 let service: AuthService;
 let now: Date;
 let verifier: string;
-const temporary = 'temporary-password-123';
+const existingPassword = 'existing-password-123';
 const permanent = 'a-new-secure-password-123';
 
 beforeAll(async () => {
   fixture = await createTestDatabase();
-  verifier = await hashPassword(temporary);
+  verifier = await hashPassword(existingPassword);
 }, 30000);
 afterAll(async () => {
   await fixture?.client.close();
@@ -34,7 +34,7 @@ beforeEach(async () => {
 });
 const login = async () => {
   const result = await service.login(
-    { username: ' STUDENT ', password: temporary },
+    { username: ' STUDENT ', password: existingPassword },
     '127.0.0.1',
   );
   if (!('token' in result)) throw new Error('Expected login session');
@@ -42,8 +42,9 @@ const login = async () => {
 };
 
 describe('auth on PostgreSQL', () => {
-  it('grants only a ten-minute setup session after proving the temporary password', async () => {
-    const issued = await login();
+  it('grants only a ten-minute setup session for a pending username', async () => {
+    const issued = await service.login({ username: 'student' }, '127.0.0.1');
+    if (!('token' in issued)) throw new Error('Expected setup session');
     expect(issued.session.kind).toBe('password_setup');
     expect(issued.session.expiresAt).toBe('2026-11-12T12:10:00.000Z');
     const [stored] = await fixture.db.select().from(authSessions);
@@ -57,8 +58,12 @@ describe('auth on PostgreSQL', () => {
 
   it('uses one generic error for unknown users, bad passwords and disabled users', async () => {
     await expect(
-      service.login({ username: 'unknown', password: temporary }, '127.0.0.1'),
+      service.login(
+        { username: 'unknown', password: existingPassword },
+        '127.0.0.1',
+      ),
     ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+    await fixture.db.update(users).set({ status: 'active' });
     await expect(
       service.login({ username: 'student', password: 'wrong' }, '127.0.0.1'),
     ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
@@ -69,7 +74,7 @@ describe('auth on PostgreSQL', () => {
     expect(await fixture.db.select().from(authSessions)).toHaveLength(0);
   });
 
-  it('requires setup proof, matching passwords and a changed password', async () => {
+  it('requires a setup session and matching passwords', async () => {
     await expect(
       service.setupPassword(null, {
         password: permanent,
@@ -83,12 +88,19 @@ describe('auth on PostgreSQL', () => {
         confirmPassword: 'different',
       }),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
-    await expect(
-      service.setupPassword(issued.token, {
-        password: temporary,
-        confirmPassword: temporary,
-      }),
-    ).rejects.toMatchObject({ code: 'PASSWORD_REUSE' });
+  });
+
+  it('ignores an old password hash when activating a pending account', async () => {
+    const issued = await service.login(
+      { username: 'student', password: 'unused-password' },
+      '127.0.0.1',
+    );
+    if (!('token' in issued)) throw new Error('Expected setup session');
+    const active = await service.setupPassword(issued.token, {
+      password: existingPassword,
+      confirmPassword: existingPassword,
+    });
+    expect(active.session.kind).toBe('authenticated');
   });
 
   it('activates once, revokes all setup sessions and rotates to a fixed 24-hour session', async () => {
@@ -244,17 +256,18 @@ describe('auth on PostgreSQL', () => {
     expect(result.rows).toHaveLength(0);
   });
 
-  it('limits setup derivations per user across multiple setup sessions', async () => {
+  it('limits setup derivations per user regardless of setup session', async () => {
     const first = await login();
     const second = await login();
-    for (let i = 0; i < 5; i++) {
-      await expect(
-        service.setupPassword(first.token, {
-          password: temporary,
-          confirmPassword: temporary,
-        }),
-      ).rejects.toMatchObject({ code: 'PASSWORD_REUSE' });
-    }
+    expect(first.token).not.toBe(second.token);
+    await fixture.client.query(
+      `INSERT INTO rate_limits(key, window_started_at, count, expires_at) VALUES ($1, $2, 5, $3)`,
+      [
+        `setup:user:${hashSessionToken(first.session.user.id)}`,
+        now.toISOString(),
+        new Date(now.getTime() + 600000).toISOString(),
+      ],
+    );
     await expect(
       service.setupPassword(second.token, {
         password: permanent,
@@ -288,22 +301,30 @@ describe('auth on PostgreSQL', () => {
     }
   });
 
-  it('creates an admin with a one-time temporary password and refuses duplicates', async () => {
+  it('creates an admin without a password and supports username-only activation', async () => {
     const admin = await createAdmin(fixture.db, ' New.Admin ');
     expect(admin.username).toBe('new.admin');
-    expect(admin.temporaryPassword).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(admin).not.toHaveProperty('temporaryPassword');
     const [stored] = await fixture.db
       .select()
       .from(users)
       .where(eq(users.username, admin.username));
     expect(stored?.role).toBe('admin');
     expect(stored?.status).toBe('pending_password');
-    expect(stored?.passwordHash).not.toBe(admin.temporaryPassword);
+    expect(stored?.passwordHash).toBeNull();
     const issued = await service.login(
-      { username: admin.username, password: admin.temporaryPassword },
+      { username: admin.username },
       '127.0.0.1',
     );
     expect('token' in issued && issued.session.kind).toBe('password_setup');
+    if (!('token' in issued)) throw new Error('Expected setup session');
+    const active = await service.setupPassword(issued.token, {
+      password: permanent,
+      confirmPassword: permanent,
+    });
+    expect(
+      (await service.requireSession(active.token, 'admin')).user.role,
+    ).toBe('admin');
     await expect(createAdmin(fixture.db, 'new.admin')).rejects.toThrow();
     expect(
       (await fixture.db.select().from(users)).filter(
