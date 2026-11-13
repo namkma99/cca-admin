@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  authSettingsSchema,
+  DEFAULT_AUTH_SETTINGS,
+  updateAuthSettingsSchema,
+} from './auth';
 
 export const appSettingsSchema = z.object({
   examDurationMinutes: z.coerce.number().int().min(10).max(300).default(120),
@@ -6,6 +11,7 @@ export const appSettingsSchema = z.object({
   passingScorePercentage: z.coerce.number().min(0).max(100).default(70),
   systemName: z.string().trim().min(1).max(100).default('CCA Exam System'),
   allowReviewAnswers: z.boolean().default(true),
+  auth: authSettingsSchema.default(DEFAULT_AUTH_SETTINGS),
 });
 
 export const updateSettingsSchema = z.object({
@@ -14,6 +20,7 @@ export const updateSettingsSchema = z.object({
   passingScorePercentage: z.coerce.number().min(0).max(100).optional(),
   systemName: z.string().trim().min(1).max(100).optional(),
   allowReviewAnswers: z.boolean().optional(),
+  auth: updateAuthSettingsSchema.optional(),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

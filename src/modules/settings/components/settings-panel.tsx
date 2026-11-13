@@ -8,6 +8,36 @@ import type { AppSettings } from '../contracts/schemas';
 const inputClass =
   'mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+const sessionFields = [
+  {
+    key: 'sessionDurationMinutes',
+    label: 'Thời hạn phiên đăng nhập (phút)',
+    max: 43200,
+  },
+  {
+    key: 'passwordSetupDurationMinutes',
+    label: 'Thời hạn phiên đặt mật khẩu (phút)',
+    max: 60,
+  },
+] as const;
+const rateLimitFields = [
+  {
+    key: 'windowMinutes',
+    label: 'Khoảng thời gian giới hạn đăng nhập (phút)',
+    max: 1440,
+  },
+  {
+    key: 'maxAttemptsPerUsername',
+    label: 'Số lần đăng nhập tối đa / tài khoản',
+    max: 10000,
+  },
+  {
+    key: 'maxAttemptsPerIp',
+    label: 'Số lần đăng nhập tối đa / IP',
+    max: 10000,
+  },
+] as const;
+
 export function SettingsPanel({
   initialSettings,
 }: {
@@ -56,7 +86,7 @@ export function SettingsPanel({
           </Link>
           <h1 className="mt-2 text-3xl font-semibold">Cài đặt hệ thống</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Quản lý cấu hình kỳ thi và thông số hệ thống CCA.
+            Quản lý cấu hình kỳ thi, xác thực và thông số hệ thống CCA.
           </p>
         </div>
       </div>
@@ -197,6 +227,79 @@ export function SettingsPanel({
               </label>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-lg border border-border p-6 shadow-xs space-y-5">
+          <h2 className="text-xl font-semibold">Xác thực & phiên đăng nhập</h2>
+          <p className="text-sm text-muted-foreground">
+            Thời hạn mới áp dụng cho phiên được cấp sau khi lưu. Phiên đang tồn
+            tại giữ nguyên ngày hết hạn.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {sessionFields.map(({ key, label, max }) => (
+              <div key={key}>
+                <label htmlFor={key} className="text-sm font-medium">
+                  {label}
+                </label>
+                <input
+                  id={key}
+                  type="number"
+                  min={1}
+                  max={max}
+                  step={1}
+                  required
+                  value={form.auth[key]}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      auth: { ...form.auth, [key]: Number(e.target.value) },
+                    })
+                  }
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Từ 1 đến {max} phút.
+                </p>
+              </div>
+            ))}
+            {rateLimitFields.map(({ key, label, max }) => (
+              <div key={key}>
+                <label htmlFor={key} className="text-sm font-medium">
+                  {label}
+                </label>
+                <input
+                  id={key}
+                  type="number"
+                  min={1}
+                  max={max}
+                  step={1}
+                  required
+                  value={form.auth.loginRateLimit[key]}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      auth: {
+                        ...form.auth,
+                        loginRateLimit: {
+                          ...form.auth.loginRateLimit,
+                          [key]: Number(e.target.value),
+                        },
+                      },
+                    })
+                  }
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Giá trị nguyên từ 1 đến {max}.
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Giới hạn tính cả đăng nhập thành công và thất bại. Thay đổi không
+            xóa bộ đếm hiện tại; khoảng thời gian mới áp dụng khi bộ đếm bắt đầu
+            chu kỳ tiếp theo.
+          </p>
         </div>
 
         <div className="flex justify-end">

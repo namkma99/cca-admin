@@ -75,6 +75,11 @@
       "key": "cronSecret",
       "value": "local-cron-secret-cca-super-secret-key-32chars",
       "type": "string"
+    },
+    {
+      "key": "reviewTopicId",
+      "value": "cca-f",
+      "type": "string"
     }
   ],
   "item": [
@@ -664,7 +669,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "admin", "settings"]
             },
-            "description": "Lấy toàn bộ cấu hình hệ thống (thời lượng thi, số lượng đề thi, điểm chuẩn, tên hệ thống, cho phép xem lại đáp án)."
+            "description": "Lấy cấu hình hệ thống và auth (thời hạn phiên, giới hạn đăng nhập). Chỉ admin đã đăng nhập được truy cập."
           }
         },
         {
@@ -696,14 +701,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"examDurationMinutes\": 120,\n  \"formCount\": 10,\n  \"passingScorePercentage\": 70,\n  \"systemName\": \"CCA Exam System\",\n  \"allowReviewAnswers\": true\n}"
+              "raw": "{\n  \"examDurationMinutes\": 120,\n  \"formCount\": 10,\n  \"passingScorePercentage\": 70,\n  \"systemName\": \"CCA Exam System\",\n  \"allowReviewAnswers\": true,\n  \"auth\": {\n    \"sessionDurationMinutes\": 1440,\n    \"passwordSetupDurationMinutes\": 10,\n    \"loginRateLimit\": {\n      \"windowMinutes\": 15,\n      \"maxAttemptsPerUsername\": 10,\n      \"maxAttemptsPerIp\": 50\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/admin/settings",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "admin", "settings"]
             },
-            "description": "Cập nhật cấu hình hệ thống."
+            "description": "Cập nhật cấu hình chung, bài thi và auth. Hỗ trợ cập nhật từng trường, kể cả bên trong auth.loginRateLimit. Thời hạn áp dụng cho phiên mới; bộ đếm đang tồn tại giữ hạn cũ."
           }
         }
       ]
@@ -1011,6 +1016,81 @@
               "path": ["api", "internal", "cron"]
             },
             "description": "Dọn dẹp tự động hàng ngày: tự động nộp bài (finalize timed_out) cho các bài thi quá hạn 120 phút, xóa phiên làm việc hết hạn và reset bộ đếm rate limit."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Review",
+      "description": "Ôn tập dạng đọc câu hỏi và đáp án, chỉ dùng ngân hàng CCA hiện có. Đăng nhập trước để Postman gửi cookie phiên.",
+      "item": [
+        {
+          "name": "Review Topics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Authenticated review response\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"private, no-store\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.topics).to.be.an(\"array\");",
+                  "    body.topics.forEach(topic => pm.expect(topic.questionCount).to.be.at.least(0));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/review/topics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "review", "topics"]
+            },
+            "description": "Danh sách ba chủ đề CCA và số câu ready hiện có. Yêu cầu cookie đăng nhập admin hoặc student."
+          }
+        },
+        {
+          "name": "Review Questions and Answers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Authenticated review response\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"private, no-store\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.topicId).to.eql(pm.variables.get(\"reviewTopicId\"));",
+                  "    pm.expect(body.questions).to.be.an(\"array\");",
+                  "    pm.expect(body.total).to.eql(body.questions.length);",
+                  "    body.questions.forEach(question => pm.expect(question.correctChoiceIds).to.be.an(\"array\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/review/topics/{{reviewTopicId}}/questions",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "review",
+                "topics",
+                "{{reviewTopicId}}",
+                "questions"
+              ]
+            },
+            "description": "Toàn bộ câu ready và đáp án đúng của chủ đề, không giới hạn theo đề thi, không tiêu tốn lượt thi. Cookie jar dùng chung với API đăng nhập."
           }
         }
       ]

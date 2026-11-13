@@ -15,10 +15,9 @@ import type { AuthSession } from '../contracts/dto';
 import { loginSchema, setupPasswordSchema } from '../contracts/schemas';
 import { AuthError, forbidden, unauthenticated } from './errors';
 import type { AuthDatabase } from './types';
+import { SettingsService } from '@/modules/settings/server/service';
 
-export const AUTH_SESSION_MS = 24 * 60 * 60 * 1000;
-export const SETUP_SESSION_MS = 10 * 60 * 1000;
-const RATE_WINDOW_MS = 15 * 60 * 1000;
+const MAX_PASSWORD_SETUP_ATTEMPTS = 5;
 type UserRow = typeof users.$inferSelect;
 type SessionRow = typeof authSessions.$inferSelect;
 
@@ -58,8 +57,7 @@ export class AuthService {
   ) {
     const now = this.now();
     const expires = new Date(now.getTime() + windowMs);
-    const allowed = await this.db.transaction(async (tx) => {
-      let allowed = true;
+    const retryAfterSeconds = await this.db.transaction(async (tx) => {
       // Consistent order, including for attempts against nonexistent usernames.
       for (const [key, limit] of buckets) {
         const [row] = await tx
@@ -73,21 +71,26 @@ export class AuthService {
               expiresAt: sql`CASE WHEN ${rateLimits.expiresAt} <= ${now} THEN ${expires} ELSE ${rateLimits.expiresAt} END`,
             },
           })
-          .returning({ count: rateLimits.count });
-        if (!row || row.count > limit) {
-          allowed = false;
-          break;
-        }
+          .returning({
+            count: rateLimits.count,
+            expiresAt: rateLimits.expiresAt,
+          });
+        if (!row) throw new Error('Rate limit update failed');
+        if (row.count > limit)
+          return Math.max(
+            1,
+            Math.ceil((row.expiresAt.getTime() - now.getTime()) / 1000),
+          );
       }
-      return allowed;
+      return 0;
     });
     // Throw after commit so denied/failed logins cannot roll back the counters.
-    if (!allowed)
+    if (retryAfterSeconds > 0)
       throw new AuthError(
         'RATE_LIMITED',
         429,
-        `Bạn đã thử quá nhiều lần. Vui lòng thử lại sau ${windowMs / 60000} phút.`,
-        windowMs / 1000,
+        `Bạn đã thử quá nhiều lần. Vui lòng thử lại sau ${Math.ceil(retryAfterSeconds / 60)} phút.`,
+        retryAfterSeconds,
       );
   }
 
@@ -100,12 +103,19 @@ export class AuthService {
         'Vui lòng kiểm tra username và mật khẩu.',
       );
     const { username, password } = parsed.data;
+    const policy = await new SettingsService(this.db).getAuth();
     await this.consumeLimit(
       [
-        [`login:ip:${hashSessionToken(ip)}`, 50],
-        [`login:user:${hashSessionToken(username)}`, 10],
+        [
+          `login:ip:${hashSessionToken(ip)}`,
+          policy.loginRateLimit.maxAttemptsPerIp,
+        ],
+        [
+          `login:user:${hashSessionToken(username)}`,
+          policy.loginRateLimit.maxAttemptsPerUsername,
+        ],
       ],
-      RATE_WINDOW_MS,
+      policy.loginRateLimit.windowMinutes * 60_000,
     );
     const [original] = await this.db
       .select()
@@ -146,7 +156,9 @@ export class AuthService {
             userId: user.id,
             tokenHash: hashSessionToken(token),
             kind: 'password_setup',
-            expiresAt: new Date(now.getTime() + SETUP_SESSION_MS),
+            expiresAt: new Date(
+              now.getTime() + policy.passwordSetupDurationMinutes * 60_000,
+            ),
             createdAt: now,
             updatedAt: now,
           })
@@ -191,7 +203,9 @@ export class AuthService {
           userId: user.id,
           tokenHash: hashSessionToken(token),
           kind: 'authenticated',
-          expiresAt: new Date(now.getTime() + AUTH_SESSION_MS),
+          expiresAt: new Date(
+            now.getTime() + policy.sessionDurationMinutes * 60_000,
+          ),
           createdAt: now,
           updatedAt: now,
         })
@@ -227,8 +241,13 @@ export class AuthService {
     token: string | null,
     role?: 'admin' | 'student',
   ): Promise<AuthSession> {
-    const session = await this.getSession(token);
-    if (!session) throw unauthenticated();
+    const row = await this.lookup(token);
+    const now = this.now();
+    if (!row || row.session.revokedAt || row.session.expiresAt <= now)
+      throw unauthenticated();
+    if (row.user.status === 'disabled') throw forbidden();
+    if (!usable(row.user, row.session, now)) throw unauthenticated();
+    const session = toSession(row.user, row.session);
     if (
       session.kind !== 'authenticated' ||
       (role && session.user.role !== role)
@@ -255,9 +274,15 @@ export class AuthService {
       original.session.kind !== 'password_setup'
     )
       throw unauthenticated();
+    const policy = await new SettingsService(this.db).getAuth();
     await this.consumeLimit(
-      [[`setup:user:${hashSessionToken(original.user.id)}`, 5]],
-      SETUP_SESSION_MS,
+      [
+        [
+          `setup:user:${hashSessionToken(original.user.id)}`,
+          MAX_PASSWORD_SETUP_ATTEMPTS,
+        ],
+      ],
+      policy.passwordSetupDurationMinutes * 60_000,
     );
     if (
       original.user.passwordHash &&
@@ -313,7 +338,9 @@ export class AuthService {
           userId: user.id,
           tokenHash: hashSessionToken(nextToken),
           kind: 'authenticated',
-          expiresAt: new Date(now.getTime() + AUTH_SESSION_MS),
+          expiresAt: new Date(
+            now.getTime() + policy.sessionDurationMinutes * 60_000,
+          ),
           createdAt: now,
           updatedAt: now,
         })

@@ -5,6 +5,8 @@ Project dự kiến triển khai trên Vercel, kết hợp API phòng thi và gi
 ## Tài liệu hiện hành
 
 - [Auth đã triển khai](docs/auth-implementation.md): API, cookie, cấu hình origin và script tạo admin.
+- [Cấu hình auth trong Settings](docs/auth-settings.md): thời hạn phiên, giới hạn đăng nhập, API quản trị và migration mặc định.
+- [API ôn tập](src/modules/review/README.md): danh sách chủ đề và toàn bộ câu hỏi/đáp án CCA cho người đã đăng nhập.
 - [Kiến trúc, công nghệ và structure](docs/architecture.md): Next.js fullstack gọn cho khoảng 10 user, Vercel Hobby + Neon Free.
 - [Schema 8 bảng và relationship](docs/database-design.md): cột, khóa ngoại, ràng buộc, transaction và vòng đời dữ liệu.
 - [Thiết kế API, auth và admin](docs/auth-and-api-design.md): hướng mới cùng những điểm cần xác nhận trước khi viết code.
@@ -33,7 +35,7 @@ Trang nền tảng chạy không cần credentials. Chỉ cấu hình `DATABASE_
 - Trang CCA trên GitHub Pages đăng nhập bằng username/password; các trang công khai khác không yêu cầu đăng nhập.
 - Dùng HttpOnly cookie, phiên đăng nhập có thời hạn tuyệt đối 24 giờ.
 - Bỏ OTP và dịch vụ gửi email.
-- Ngân hàng câu hỏi và đáp án lưu trong database; API chỉ trả nội dung được cấp và không trả đáp án đúng.
+- Ngân hàng câu hỏi và đáp án lưu trong database; API thi không trả đáp án đúng. API ôn tập trả toàn bộ câu `ready` cùng đáp án theo chủ đề, yêu cầu phiên đăng nhập hợp lệ.
 
 ## Tài liệu lịch sử
 
