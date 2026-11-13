@@ -640,6 +640,71 @@
             },
             "description": "Xem nhật ký thay đổi trạng thái quản trị đối với tài khoản học viên (khóa, mở khóa, đổi mật khẩu, reset chu kỳ)."
           }
+        },
+        {
+          "name": "Get System Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "settings"]
+            },
+            "description": "Lấy toàn bộ cấu hình hệ thống (thời lượng thi, số lượng đề thi, điểm chuẩn, tên hệ thống, cho phép xem lại đáp án)."
+          }
+        },
+        {
+          "name": "Update System Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{baseUrl}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"examDurationMinutes\": 120,\n  \"formCount\": 10,\n  \"passingScorePercentage\": 70,\n  \"systemName\": \"CCA Exam System\",\n  \"allowReviewAnswers\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "settings"]
+            },
+            "description": "Cập nhật cấu hình hệ thống."
+          }
         }
       ]
     },
