@@ -38,11 +38,11 @@ npm run db:migrate
 npm run admin:create -- admin
 ```
 
-Lệnh tạo username đã chuẩn hóa lowercase, role admin, status pending_password và mật khẩu tạm ngẫu nhiên 24 byte (32 ký tự base64url). Database chỉ lưu scrypt verifier. Mật khẩu tạm được in một lần ở terminal sau khi INSERT thành công; tránh chạy lệnh trong CI có log công khai hoặc redirect đầu ra vào file được commit. Username đã tồn tại sẽ bị từ chối, không overwrite mật khẩu/role của tài khoản đó. Không cần truyền mật khẩu qua argv hoặc biến NEXT_PUBLIC_.
+Lệnh tạo username đã chuẩn hóa lowercase, role admin, status pending_password và password_hash null. Không sinh hoặc trả mật khẩu khi cấp tài khoản. Username đã tồn tại sẽ bị từ chối, không overwrite mật khẩu/role của tài khoản đó.
 
 Script dùng node --conditions=react-server --import tsx để giữ server-only boundary và thực thi TypeScript bằng tsx. Nó load .env.local rồi .env, không ghi file chứa mật khẩu. Không tạo auth session hoặc tự kích hoạt admin.
 
-Đăng nhập tại /login bằng mật khẩu tạm, sau đó đặt mật khẩu chính thức tại /setup-password. Khi hoàn tất, admin vào /admin; student vào /account. /admin hiện là shell có guard, chưa có màn hình quản lý user.
+Nhập username tại /login, sau đó đặt mật khẩu tại /setup-password. Khi hoàn tất, admin vào /admin; student vào /account. Tài khoản mới hoặc vừa reset chỉ cần username để kích hoạt, kể cả admin: người biết username có thể đặt mật khẩu trước chủ tài khoản.
 
 ## Endpoint REST
 
@@ -50,13 +50,15 @@ Mọi response có Cache-Control: no-store, Vary: Origin và X-Content-Type-Opti
 
 | Method/path                      | Input                                         | Kết quả                                                                                                       |
 | -------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| POST /api/v1/auth/login          | JSON username, password                       | session DTO; cookie setup 10 phút hoặc authenticated 24 giờ                                                   |
+| POST /api/v1/auth/login          | JSON username, password (khi đã kích hoạt)    | Pending: cookie setup 10 phút; active thiếu password: needPassword; đúng password: cookie 24 giờ              |
 | GET /api/v1/auth/session         | Cookie                                        | session DTO hoặc session:null nếu không hợp lệ/hết hạn                                                        |
 | POST /api/v1/auth/setup-password | Cookie setup + JSON password, confirmPassword | Kích hoạt user, thu hồi mọi phiên cũ, cấp cookie/token authenticated mới                                      |
 | POST /api/v1/auth/logout         | Cookie + JSON {}                              | Thu hồi phiên hiện tại, xóa cookie; gọi lặp vẫn thành công                                                    |
 | OPTIONS trên bốn endpoint        | Origin + preflight method/header              | Origin chính xác, credentials=true, GET/POST và Content-Type; origin/header/method ngoài allowlist bị từ chối |
 
 Session DTO gồm kind, expiresAt ISO và user{id, username, role}. Phiên setup chỉ dùng để đặt mật khẩu/đọc trạng thái/đăng xuất, không đủ quyền gọi requireSession hoặc vào admin. Khi chưa đăng nhập, API session vẫn trả 200 với session:null để UI xác định trạng thái.
+
+Login và setup-password từ Origin khớp chính xác `APP_ORIGIN` chỉ chấp nhận role `admin`. Học viên nhận HTTP 403 với code `FORBIDDEN` và thông báo “Trang quản trị chỉ dành cho tài khoản quản trị viên.” trước khi cấp phiên/cookie hoặc đổi mật khẩu. Origin frontend thi trong `CCA_ALLOWED_ORIGINS` vẫn hỗ trợ học viên và admin. Chính sách được truyền từ HTTP xuống service và kiểm tra lại role dưới khóa trước khi ghi dữ liệu. `Origin` không thay thế guard role trên trang/API quản trị.
 
 Mutation bắt buộc Origin thuộc APP_ORIGIN hoặc CCA_ALLOWED_ORIGINS và Content-Type application/json. Đọc JSON được giới hạn 8 KiB, kể cả stream không khai báo Content-Length. Không dùng GET để thay đổi auth, không phản chiếu Origin tùy ý và không cho CORS wildcard.
 
@@ -65,12 +67,12 @@ Frontend CCA bên ngoài dùng fetch với credentials:'include', kiểm tra ses
 ## Mật khẩu và vòng đời phiên
 
 - Username: trim/lowercase, 1–64 ký tự; bắt đầu bằng chữ/số, phần còn lại là a-z, 0-9, dấu chấm, gạch dưới hoặc gạch ngang.
-- Password login 1–128 ký tự. Password chính thức 12–128 ký tự, không trim, xác nhận trùng và khác mật khẩu tạm.
+- Password login 1–128 ký tự, chỉ cần cho tài khoản active. Password mới 12–128 ký tự, không trim và xác nhận trùng.
 - Scrypt N=32768, r=8, p=3; salt ngẫu nhiên 16 byte và key 64 byte. Verifier có version/tham số; không thực thi thông số tùy ý từ hash lỗi. Đây là một cấu hình scrypt được [OWASP liệt kê](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
 - Cookie token ngẫu nhiên 32 byte, DB chỉ lưu SHA-256. Cookie hết hạn không thay thế việc kiểm tra expires_at, revoked_at, trạng thái và role hiện tại của user trong DB.
 - Authenticated session có hạn tuyệt đối 24 giờ từ lúc cấp; GET/session hoặc truy cập trang không cập nhật hạn.
-- Pending user nhập đúng mật khẩu tạm nhận setup session 10 phút. Chỉ ghi first_login_at khi kích hoạt thành công; last_login_at được cập nhật khi xác thực mật khẩu thành công.
-- Password setup kiểm tra bằng chứng trước khi hash mật khẩu mới; khóa user rồi session, kiểm tra lại hash/status/expiry dưới khóa. Đổi password/status, revoke toàn bộ phiên và INSERT phiên mới trong cùng transaction. Kích hoạt lặp hoặc phiên setup cũ không dùng lại được.
+- Pending user nhập username nhận setup session 10 phút, không kiểm tra mật khẩu cũ. Chỉ ghi first_login_at khi kích hoạt thành công; last_login_at được cập nhật khi cấp phiên đăng nhập.
+- Password setup kiểm tra phiên setup trước khi hash mật khẩu mới; khóa user rồi session, kiểm tra lại hash/status/expiry dưới khóa. Đổi password/status, revoke toàn bộ phiên và INSERT phiên mới trong cùng transaction. Kích hoạt lặp hoặc phiên setup cũ không dùng lại được.
 - Login cũng kiểm tra lại password verifier và trạng thái user sau khi lấy khóa để không cấp phiên từ mật khẩu vừa bị thay thế.
 - Logout thu hồi phiên hiện tại; không kết thúc bài thi hoặc thu hồi mọi thiết bị vì chính sách đó chưa được triển khai/chốt.
 

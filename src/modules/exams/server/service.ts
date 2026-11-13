@@ -641,6 +641,12 @@ export class ExamService {
         .where(eq(users.id, userId))
         .for('update');
       if (!target) fail('NOT_FOUND', 404, 'Người dùng không tồn tại.');
+      if (target!.status === 'disabled')
+        fail(
+          'DISABLED',
+          409,
+          'Hãy mở khóa tài khoản trước khi đặt lại chu kỳ thi.',
+        );
       const [c] = await tx
         .select()
         .from(examCycles)

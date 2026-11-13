@@ -187,7 +187,7 @@ Mọi lần finalize phải đối chiếu deadline: nếu đã hết giờ thì
 
 - Ai có quyền reset chu kỳ/lượt, reset có giữ summary cũ hay xóa, xử lý bài đang chạy ra sao.
 - Có cho sửa username/role, ai được làm và bảo vệ admin cuối cùng như thế nào.
-- Chính sách cấp lại mật khẩu tạm qua admin UI; setup 10 phút và mật khẩu mới 12–128 ký tự đã được triển khai.
+- Admin reset xóa hash và chuyển về pending_password; setup bằng username trong 10 phút, mật khẩu mới 12–128 ký tự.
 - Yêu cầu đăng nhập lại khi phiên còn dưới 120 phút; xử lý bài khi khóa tài khoản hoặc phiên hết hạn.
 - Có dữ liệu production SQLite phải chuyển không; domain và origin thực tế.
 

@@ -22,6 +22,15 @@ const RATE_WINDOW_MS = 15 * 60 * 1000;
 type UserRow = typeof users.$inferSelect;
 type SessionRow = typeof authSessions.$inferSelect;
 
+function requireLoginRole(user: UserRow, requiredRole?: 'admin') {
+  if (requiredRole && user.role !== requiredRole)
+    throw new AuthError(
+      'FORBIDDEN',
+      403,
+      'Trang quản trị chỉ dành cho tài khoản quản trị viên.',
+    );
+}
+
 function toSession(user: UserRow, session: SessionRow): AuthSession {
   return {
     kind: session.kind,
@@ -91,7 +100,11 @@ export class AuthService {
       );
   }
 
-  async login(input: unknown, ip: string): Promise<LoginResult> {
+  async login(
+    input: unknown,
+    ip: string,
+    requiredRole?: 'admin',
+  ): Promise<LoginResult> {
     const parsed = loginSchema.safeParse(input);
     if (!parsed.success)
       throw new AuthError(
@@ -124,13 +137,10 @@ export class AuthService {
       await verifyPassword(password ?? 'dummy', DUMMY_PASSWORD_HASH);
       throw invalid();
     }
+    requireLoginRole(original, requiredRole);
 
-    // Step 1: User without password / first-time login
+    // Pending accounts activate by username; no temporary password is issued.
     if (original.status === 'pending_password') {
-      if (original.passwordHash && password) {
-        const correct = await verifyPassword(password, original.passwordHash);
-        if (!correct) throw invalid();
-      }
       return this.db.transaction(async (tx) => {
         const [user] = await tx
           .select()
@@ -138,6 +148,7 @@ export class AuthService {
           .where(eq(users.id, original.id))
           .for('update');
         if (!user || user.status !== 'pending_password') throw invalid();
+        requireLoginRole(user, requiredRole);
         const now = this.now();
         const token = createSessionToken();
         const [session] = await tx
@@ -183,6 +194,7 @@ export class AuthService {
         user.status !== 'active'
       )
         throw invalid();
+      requireLoginRole(user, requiredRole);
       const now = this.now();
       const token = createSessionToken();
       const [session] = await tx
@@ -240,6 +252,7 @@ export class AuthService {
   async setupPassword(
     token: string | null,
     input: unknown,
+    requiredRole?: 'admin',
   ): Promise<{ token: string; session: AuthSession }> {
     const parsed = setupPasswordSchema.safeParse(input);
     if (!parsed.success)
@@ -255,19 +268,11 @@ export class AuthService {
       original.session.kind !== 'password_setup'
     )
       throw unauthenticated();
+    requireLoginRole(original.user, requiredRole);
     await this.consumeLimit(
       [[`setup:user:${hashSessionToken(original.user.id)}`, 5]],
       SETUP_SESSION_MS,
     );
-    if (
-      original.user.passwordHash &&
-      (await verifyPassword(parsed.data.password, original.user.passwordHash))
-    )
-      throw new AuthError(
-        'PASSWORD_REUSE',
-        400,
-        'Hãy chọn mật khẩu khác mật khẩu tạm.',
-      );
     // Expensive derivation happens before locks; recheck the verifier and session under lock.
     const passwordHash = await hashPassword(parsed.data.password);
     return this.db.transaction(async (tx) => {
@@ -290,6 +295,7 @@ export class AuthService {
         user.passwordHash !== original.user.passwordHash
       )
         throw unauthenticated();
+      requireLoginRole(user, requiredRole);
       await tx
         .update(users)
         .set({

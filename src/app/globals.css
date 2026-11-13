@@ -2,6 +2,7 @@
 
 :root {
   --background: #f8fafc;
+  --surface: #ffffff;
   --foreground: #0f172a;
   --primary: #1d4ed8;
   --primary-foreground: #ffffff;
@@ -15,6 +16,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0f172a;
+    --surface: #162033;
     --foreground: #f1f5f9;
     --primary: #93c5fd;
     --primary-foreground: #0f172a;
@@ -28,6 +30,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
