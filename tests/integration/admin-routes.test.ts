@@ -129,7 +129,8 @@ it('guards every real admin route against anonymous, student, setup, disabled, r
     ['anonymous', 401],
     ['student', 403],
     ['setup', 403],
-    ['disabled', 401],
+    // An unexpired, unrevoked session on a restricted account is forbidden.
+    ['disabled', 403],
     ['revoked', 401],
     ['expired', 401],
   ] as const) {

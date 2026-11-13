@@ -1,5 +1,7 @@
 # Auth username/password: vận hành và contract
 
+Chính sách thời hạn phiên và giới hạn đăng nhập hiện có thể chỉnh tại Admin Settings. Xem [cấu hình auth](auth-settings.md) để biết hợp đồng API, giới hạn giá trị và cách áp dụng; các mốc 24 giờ/10 phút/15 phút bên dưới là mặc định.
+
 Đã triển khai trong project này: login, session, setup-password, logout, UI login/setup, page guard admin/account và script tạo admin. Chưa kết nối frontend CCA ở repo next-pro, chưa làm user CRUD/reset mật khẩu/reset lượt thi hoặc Cron cleanup. Không có đăng ký công khai và không tự tạo tài khoản khi server khởi động.
 
 ## Cấu hình
