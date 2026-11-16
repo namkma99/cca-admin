@@ -7,8 +7,9 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ topicId: string }> },
 ) {
+  const q = new URL(request.url).searchParams.get('q');
   return reviewApi(request, async (db, token) =>
-    new ReviewService(db).questions(token, (await context.params).topicId),
+    new ReviewService(db).questions(token, (await context.params).topicId, q),
   );
 }
 export const OPTIONS = (request: Request) =>

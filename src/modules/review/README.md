@@ -26,7 +26,7 @@ Số lượng lấy trực tiếp từ database, chỉ đếm câu `ready`. Luô
 
 ## Toàn bộ câu hỏi và đáp án
 
-`GET /api/v1/review/topics/{topicId}/questions`
+`GET /api/v1/review/topics/{topicId}/questions` (hỗ trợ lọc từ khóa tùy chọn qua `?q=<keyword>`)
 
 Ví dụ minh họa cấu trúc, không phải dữ liệu ngân hàng thật:
 
@@ -52,6 +52,16 @@ Ví dụ minh họa cấu trúc, không phải dữ liệu ngân hàng thật:
         ],
         "questionKeywords": ["Câu hỏi minh họa"],
         "answerKeywords": ["Lựa chọn B"],
+        "quickFormulaVi": "[Đề có: \"Câu hỏi minh họa\"] ➔ Chọn B (\"Lựa chọn B\") — Giải thích vì sao chọn B.",
+        "keywordMappings": [
+          {
+            "choiceId": "B",
+            "questionKeywords": ["Câu hỏi minh họa"],
+            "answerKeyword": "Lựa chọn B",
+            "choiceTextVi": "Bản dịch lựa chọn B",
+            "whyVi": "Giải thích vì sao chọn B."
+          }
+        ],
         "explanationVi": "Giải thích vì sao chọn B."
       }
     }
