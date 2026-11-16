@@ -134,6 +134,24 @@ beforeEach(async () => {
         ],
         questionKeywords: ['Select both'],
         answerKeywords: ['First', 'Second'],
+        quickFormulaVi:
+          '[Đề có: "Select both"] ➔ Chọn A ("First") — Cần chọn A. | [Đề có: "Select both"] ➔ Chọn B ("Second") — Cần chọn B.',
+        keywordMappings: [
+          {
+            choiceId: 'A',
+            questionKeywords: ['Select both'],
+            answerKeyword: 'First',
+            choiceTextVi: 'Thứ nhất',
+            whyVi: 'Cần chọn A.',
+          },
+          {
+            choiceId: 'B',
+            questionKeywords: ['Select both'],
+            answerKeyword: 'Second',
+            choiceTextVi: 'Thứ hai',
+            whyVi: 'Cần chọn B.',
+          },
+        ],
         explanationVi: 'Cần chọn cả A và B.',
       },
     },
@@ -228,11 +246,35 @@ describe('review API', () => {
             ],
             questionKeywords: ['Select both'],
             answerKeywords: ['First', 'Second'],
+            quickFormulaVi:
+              '[Đề có: "Select both"] ➔ Chọn A ("First") — Cần chọn A. | [Đề có: "Select both"] ➔ Chọn B ("Second") — Cần chọn B.',
+            keywordMappings: [
+              {
+                choiceId: 'A',
+                questionKeywords: ['Select both'],
+                answerKeyword: 'First',
+                choiceTextVi: 'Thứ nhất',
+                whyVi: 'Cần chọn A.',
+              },
+              {
+                choiceId: 'B',
+                questionKeywords: ['Select both'],
+                answerKeyword: 'Second',
+                choiceTextVi: 'Thứ hai',
+                whyVi: 'Cần chọn B.',
+              },
+            ],
             explanationVi: 'Cần chọn cả A và B.',
           },
         },
       ],
     });
+    const filtered = await getQuestions(
+      request('/cca-f/questions?q=Question%2065', adminToken),
+      { params: Promise.resolve({ topicId: 'cca-f' }) },
+    );
+    expect(filtered.status).toBe(200);
+    expect((await filtered.json()).total).toBe(1);
   });
 
   it('returns an empty list for a valid empty topic and 404 for unknown topics', async () => {

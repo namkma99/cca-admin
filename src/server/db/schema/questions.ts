@@ -11,11 +11,20 @@ import {
 import { timestamps } from './common';
 
 export type QuestionChoice = { id: string; text: string };
+export type QuestionKeywordMapping = {
+  choiceId: string;
+  questionKeywords: string[];
+  answerKeyword: string;
+  choiceTextVi: string;
+  whyVi: string;
+};
 export type QuestionStudyGuide = {
   promptVi: string;
   choicesVi: QuestionChoice[];
   questionKeywords: string[];
   answerKeywords: string[];
+  quickFormulaVi?: string;
+  keywordMappings?: QuestionKeywordMapping[];
   explanationVi: string;
 };
 export type QuestionSnapshot = {

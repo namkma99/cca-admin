@@ -4,11 +4,21 @@ import type {
   TopicId,
 } from '@/modules/exams/contracts/dto';
 
+export type QuestionKeywordMapping = {
+  choiceId: string;
+  questionKeywords: string[];
+  answerKeyword: string;
+  choiceTextVi: string;
+  whyVi: string;
+};
+
 export type QuestionStudyGuide = {
   promptVi: string;
   choicesVi: Choice[];
   questionKeywords: string[];
   answerKeywords: string[];
+  quickFormulaVi?: string;
+  keywordMappings?: QuestionKeywordMapping[];
   explanationVi: string;
 };
 

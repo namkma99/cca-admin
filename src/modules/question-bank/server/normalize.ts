@@ -1,5 +1,6 @@
 import type {
   QuestionChoice,
+  QuestionKeywordMapping,
   QuestionStudyGuide,
 } from '@/server/db/schema/questions';
 import { AppError } from '@/server/http/errors';
@@ -54,6 +55,42 @@ function normalizeStringList(value: unknown): string[] | null {
   return value.map((item) => (item as string).trim());
 }
 
+function normalizeKeywordMappings(
+  value: unknown,
+  choices: QuestionChoice[],
+): QuestionKeywordMapping[] | undefined | null {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const choiceIds = new Set(choices.map((c) => c.id));
+  const result: QuestionKeywordMapping[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const choiceId = text(item.choiceId)?.trim() ?? '';
+    const answerKeyword = text(item.answerKeyword)?.trim() ?? '';
+    const choiceTextVi = text(item.choiceTextVi)?.trim() ?? '';
+    const whyVi = text(item.whyVi)?.trim() ?? '';
+    const questionKeywords = normalizeStringList(item.questionKeywords);
+    if (
+      !choiceId ||
+      !choiceIds.has(choiceId) ||
+      !answerKeyword ||
+      !choiceTextVi ||
+      !whyVi ||
+      !questionKeywords ||
+      questionKeywords.length === 0
+    )
+      return null;
+    result.push({
+      choiceId,
+      questionKeywords,
+      answerKeyword,
+      choiceTextVi,
+      whyVi,
+    });
+  }
+  return result;
+}
+
 function normalizeStudyGuide(
   value: unknown,
   choices: QuestionChoice[],
@@ -63,9 +100,17 @@ function normalizeStudyGuide(
   if (!isRecord(value)) fail(`Study guide for ${id} must be an object.`);
   const promptVi = text(value.promptVi)?.trim() ?? '';
   const explanationVi = text(value.explanationVi)?.trim() ?? '';
+  const quickFormulaVi =
+    value.quickFormulaVi === undefined || value.quickFormulaVi === null
+      ? undefined
+      : (text(value.quickFormulaVi)?.trim() ?? '');
   const normalizedChoicesVi = normalizeChoices(value.choicesVi);
   const questionKeywords = normalizeStringList(value.questionKeywords);
   const answerKeywords = normalizeStringList(value.answerKeywords);
+  const keywordMappings = normalizeKeywordMappings(
+    value.keywordMappings,
+    choices,
+  );
   const choiceIdsMatch =
     normalizedChoicesVi.choices.length === choices.length &&
     normalizedChoicesVi.choices.every(
@@ -74,6 +119,8 @@ function normalizeStudyGuide(
   if (
     !promptVi ||
     !explanationVi ||
+    quickFormulaVi === '' ||
+    keywordMappings === null ||
     normalizedChoicesVi.malformed ||
     !choiceIdsMatch ||
     !questionKeywords ||
@@ -87,6 +134,8 @@ function normalizeStudyGuide(
     choicesVi: normalizedChoicesVi.choices,
     questionKeywords,
     answerKeywords,
+    ...(quickFormulaVi ? { quickFormulaVi } : {}),
+    ...(keywordMappings ? { keywordMappings } : {}),
     explanationVi,
   };
 }

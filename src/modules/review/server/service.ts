@@ -37,6 +37,7 @@ export class ReviewService {
   async questions(
     token: string | null,
     topicId: string,
+    query?: string | null,
   ): Promise<ReviewQuestionsResponse> {
     await new AuthService(this.db).requireSession(token);
     const topic = topics.find((item) => item.id === topicId);
@@ -56,25 +57,32 @@ export class ReviewService {
         and(eq(questions.topicCode, topic.id), eq(questions.status, 'ready')),
       )
       .orderBy(asc(questions.sourceNumber), asc(questions.id));
+    const normalizedQuery = query?.trim().toLowerCase() ?? '';
+    const mapped = rows.map((row) => {
+      // Ready rows are constrained by SQL and validated by the bank importer.
+      if (row.type === 'unsupported' || row.prompt === null)
+        throw new AppError(
+          'INVALID_BANK',
+          500,
+          'Dữ liệu câu hỏi không hợp lệ.',
+        );
+      const { studyGuide, ...rest } = row;
+      return {
+        ...rest,
+        type: row.type,
+        prompt: row.prompt,
+        ...(studyGuide ? { studyGuide } : {}),
+      };
+    });
+    const filtered = normalizedQuery
+      ? mapped.filter((item) =>
+          JSON.stringify(item).toLowerCase().includes(normalizedQuery),
+        )
+      : mapped;
     return {
       topicId: topic.id,
-      total: rows.length,
-      questions: rows.map((row) => {
-        // Ready rows are constrained by SQL and validated by the bank importer.
-        if (row.type === 'unsupported' || row.prompt === null)
-          throw new AppError(
-            'INVALID_BANK',
-            500,
-            'Dữ liệu câu hỏi không hợp lệ.',
-          );
-        const { studyGuide, ...rest } = row;
-        return {
-          ...rest,
-          type: row.type,
-          prompt: row.prompt,
-          ...(studyGuide ? { studyGuide } : {}),
-        };
-      }),
+      total: filtered.length,
+      questions: filtered,
     };
   }
 }
