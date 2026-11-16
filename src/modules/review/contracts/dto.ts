@@ -4,6 +4,14 @@ import type {
   TopicId,
 } from '@/modules/exams/contracts/dto';
 
+export type QuestionStudyGuide = {
+  promptVi: string;
+  choicesVi: Choice[];
+  questionKeywords: string[];
+  answerKeywords: string[];
+  explanationVi: string;
+};
+
 export type ReviewTopic = {
   id: TopicId;
   name: string;
@@ -16,6 +24,7 @@ export type ReviewQuestion = {
   prompt: string;
   choices: Choice[];
   correctChoiceIds: string[];
+  studyGuide?: QuestionStudyGuide;
 };
 
 export type ReviewTopicsResponse = { topics: ReviewTopic[] };

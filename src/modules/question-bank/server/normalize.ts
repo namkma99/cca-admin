@@ -1,4 +1,7 @@
-import type { QuestionChoice } from '@/server/db/schema/questions';
+import type {
+  QuestionChoice,
+  QuestionStudyGuide,
+} from '@/server/db/schema/questions';
 import { AppError } from '@/server/http/errors';
 
 export type CanonicalQuestion = {
@@ -8,6 +11,7 @@ export type CanonicalQuestion = {
   prompt: string | null;
   choices: QuestionChoice[];
   correctChoiceIds: string[];
+  studyGuide?: QuestionStudyGuide | null;
   status: 'ready' | 'needs_review' | 'disabled';
   sourceNumber: number;
 };
@@ -16,9 +20,9 @@ const topics = new Set(['cca-f', 'ccao-f', 'ccar-p']);
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 const text = (v: unknown) => (typeof v === 'string' ? v : null);
-const fail = (message: string): never => {
+function fail(message: string): never {
   throw new AppError('INVALID_BANK', 422, message);
-};
+}
 
 function normalizeChoices(value: unknown): {
   choices: QuestionChoice[];
@@ -41,6 +45,50 @@ function normalizeChoices(value: unknown): {
     return [{ id: item.id.trim(), text: item.text.trim() }];
   });
   return { choices, malformed };
+}
+
+function normalizeStringList(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  if (value.some((item) => typeof item !== 'string' || !item.trim()))
+    return null;
+  return value.map((item) => (item as string).trim());
+}
+
+function normalizeStudyGuide(
+  value: unknown,
+  choices: QuestionChoice[],
+  id: string,
+): QuestionStudyGuide | null {
+  if (value === undefined || value === null) return null;
+  if (!isRecord(value)) fail(`Study guide for ${id} must be an object.`);
+  const promptVi = text(value.promptVi)?.trim() ?? '';
+  const explanationVi = text(value.explanationVi)?.trim() ?? '';
+  const normalizedChoicesVi = normalizeChoices(value.choicesVi);
+  const questionKeywords = normalizeStringList(value.questionKeywords);
+  const answerKeywords = normalizeStringList(value.answerKeywords);
+  const choiceIdsMatch =
+    normalizedChoicesVi.choices.length === choices.length &&
+    normalizedChoicesVi.choices.every(
+      (c, idx) => c.id === choices[idx]?.id && Boolean(c.text),
+    );
+  if (
+    !promptVi ||
+    !explanationVi ||
+    normalizedChoicesVi.malformed ||
+    !choiceIdsMatch ||
+    !questionKeywords ||
+    questionKeywords.length === 0 ||
+    !answerKeywords ||
+    answerKeywords.length === 0
+  )
+    fail(`Study guide for ${id} is malformed.`);
+  return {
+    promptVi,
+    choicesVi: normalizedChoicesVi.choices,
+    questionKeywords,
+    answerKeywords,
+    explanationVi,
+  };
 }
 
 export function normalizeBank(input: unknown): CanonicalQuestion[] {
@@ -145,6 +193,7 @@ export function normalizeBank(input: unknown): CanonicalQuestion[] {
           malformedAnswers)
       )
         fail(`Ready question ${id} is malformed.`);
+      const studyGuide = normalizeStudyGuide(rawRecord.studyGuide, choices, id);
       rows.push({
         id,
         topicCode,
@@ -152,6 +201,7 @@ export function normalizeBank(input: unknown): CanonicalQuestion[] {
         prompt: promptValue,
         choices,
         correctChoiceIds,
+        studyGuide,
         status: supported ? statusValue : 'needs_review',
         sourceNumber,
       });

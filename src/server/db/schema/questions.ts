@@ -11,6 +11,13 @@ import {
 import { timestamps } from './common';
 
 export type QuestionChoice = { id: string; text: string };
+export type QuestionStudyGuide = {
+  promptVi: string;
+  choicesVi: QuestionChoice[];
+  questionKeywords: string[];
+  answerKeywords: string[];
+  explanationVi: string;
+};
 export type QuestionSnapshot = {
   id: string;
   questionType: 'single_choice' | 'multiple_response';
@@ -37,6 +44,7 @@ export const questions = pgTable(
       .array()
       .default(sql`ARRAY[]::text[]`)
       .notNull(),
+    studyGuide: jsonb('study_guide').$type<QuestionStudyGuide | null>(),
     status: text('status', { enum: ['ready', 'needs_review', 'disabled'] })
       .default('needs_review')
       .notNull(),

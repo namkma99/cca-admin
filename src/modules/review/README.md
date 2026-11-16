@@ -43,7 +43,17 @@ Ví dụ minh họa cấu trúc, không phải dữ liệu ngân hàng thật:
         { "id": "A", "text": "Lựa chọn A" },
         { "id": "B", "text": "Lựa chọn B" }
       ],
-      "correctChoiceIds": ["B"]
+      "correctChoiceIds": ["B"],
+      "studyGuide": {
+        "promptVi": "Bản dịch câu hỏi tiếng Việt?",
+        "choicesVi": [
+          { "id": "A", "text": "Bản dịch lựa chọn A" },
+          { "id": "B", "text": "Bản dịch lựa chọn B" }
+        ],
+        "questionKeywords": ["Câu hỏi minh họa"],
+        "answerKeywords": ["Lựa chọn B"],
+        "explanationVi": "Giải thích vì sao chọn B."
+      }
     }
   ]
 }
@@ -53,7 +63,7 @@ Ví dụ minh họa cấu trúc, không phải dữ liệu ngân hàng thật:
 - Trả toàn bộ câu theo số thứ tự nguồn; không phân trang, lấy mẫu hay giới hạn theo đề thi.
 - `total` luôn bằng `questions.length`. Chủ đề hợp lệ nhưng rỗng trả `200`, `total: 0`, `questions: []`.
 - `type`: `single_choice` hoặc `multiple_response`. Đánh dấu đáp án bằng cách đối chiếu `choices[].id` với `correctChoiceIds` (có thể nhiều đáp án đúng).
-- Giữ nội dung gốc; không thêm level, giải thích hay `seniorAnswer` vì ngân hàng hiện tại không có các trường này.
+- `studyGuide` (tùy chọn, hiện đã có đủ trên 456/456 câu `ready`): chứa bản dịch tiếng Việt (`promptVi`, `choicesVi`), từ khóa nhận diện câu hỏi (`questionKeywords`), từ khóa đáp án đúng (`answerKeywords`) và giải thích (`explanationVi`).
 
 ## Lỗi và bảo mật
 

@@ -49,7 +49,7 @@ const epoch = (d: Date) => d.getTime();
 const topic = (id: TopicId) => TOPICS.find((x) => x.id === id)!;
 
 export function allocateForm(
-  rows: (typeof questions.$inferSelect)[],
+  rows: Omit<typeof questions.$inferSelect, 'studyGuide'>[],
   seed: string,
   form: number,
   total: number,
