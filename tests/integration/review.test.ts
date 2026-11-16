@@ -126,6 +126,16 @@ beforeEach(async () => {
         { id: 'B', text: 'Second' },
       ],
       correctChoiceIds: ['A', 'B'],
+      studyGuide: {
+        promptVi: 'Chọn cả hai',
+        choicesVi: [
+          { id: 'A', text: 'Thứ nhất' },
+          { id: 'B', text: 'Thứ hai' },
+        ],
+        questionKeywords: ['Select both'],
+        answerKeywords: ['First', 'Second'],
+        explanationVi: 'Cần chọn cả A và B.',
+      },
     },
     {
       id: 'draft',
@@ -210,6 +220,16 @@ describe('review API', () => {
             { id: 'B', text: 'Second' },
           ],
           correctChoiceIds: ['A', 'B'],
+          studyGuide: {
+            promptVi: 'Chọn cả hai',
+            choicesVi: [
+              { id: 'A', text: 'Thứ nhất' },
+              { id: 'B', text: 'Thứ hai' },
+            ],
+            questionKeywords: ['Select both'],
+            answerKeywords: ['First', 'Second'],
+            explanationVi: 'Cần chọn cả A và B.',
+          },
         },
       ],
     });

@@ -108,10 +108,29 @@ describe('question bank normalization and import', () => {
     ).toThrow();
   });
 
-  it('hashes canonical rows independently of input order', () => {
+  it('hashes canonical rows independently of input order and studyGuide changes', () => {
     const a = normalizeBank(bank(q('cca-f-001', 1), q('cca-f-002', 2)));
     const b = normalizeBank(bank(q('cca-f-002', 2), q('cca-f-001', 1)));
+    const withGuide = normalizeBank(
+      bank(
+        {
+          ...q('cca-f-001', 1),
+          studyGuide: {
+            promptVi: 'Đề 1',
+            choicesVi: [
+              { id: 'A', text: 'Lựa chọn A' },
+              { id: 'B', text: 'Lựa chọn B' },
+            ],
+            questionKeywords: ['Prompt'],
+            answerKeywords: ['Choice A'],
+            explanationVi: 'Giải thích A.',
+          },
+        },
+        q('cca-f-002', 2),
+      ),
+    );
     expect(calculateBankVersion(a)).toBe(calculateBankVersion(b));
+    expect(calculateBankVersion(a)).toBe(calculateBankVersion(withGuide));
   });
 });
 
@@ -154,6 +173,24 @@ describe('question bank database import', () => {
     await expect(
       importQuestions(fixture.db, bank(q('cca-f-002', 2))),
     ).rejects.toMatchObject({ code: 'BANK_IN_USE' });
+    // Updating only studyGuide while a cycle is open succeeds without changing bankVersion.
+    const guideUpdate = await importQuestions(
+      fixture.db,
+      bank({
+        ...q('cca-f-001', 1),
+        studyGuide: {
+          promptVi: 'Đề tiếng Việt',
+          choicesVi: [
+            { id: 'A', text: 'Lựa chọn A' },
+            { id: 'B', text: 'Lựa chọn B' },
+          ],
+          questionKeywords: ['Prompt'],
+          answerKeywords: ['Choice A'],
+          explanationVi: 'Giải thích.',
+        },
+      }),
+    );
+    expect(guideUpdate.changed).toBe(true);
     expect(await fixture.db.select().from(questions)).toHaveLength(1);
   });
 

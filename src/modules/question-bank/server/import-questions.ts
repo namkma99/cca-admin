@@ -35,8 +35,25 @@ export async function importQuestions(
         sourceNumber: row.sourceNumber,
       })),
     );
-    if (existing.length && existingVersion === bankVersion)
-      return report(rows, bankVersion, false);
+    if (existing.length && existingVersion === bankVersion) {
+      const existingById = new Map(
+        existing.map((row) => [row.id, row.studyGuide ?? null]),
+      );
+      const updates = rows.filter(
+        (row) =>
+          JSON.stringify(existingById.get(row.id) ?? null) !==
+          JSON.stringify(row.studyGuide ?? null),
+      );
+      if (updates.length === 0) return report(rows, bankVersion, false);
+      const now = new Date();
+      for (const row of updates) {
+        await tx
+          .update(questions)
+          .set({ studyGuide: row.studyGuide ?? null, updatedAt: now })
+          .where(eq(questions.id, row.id));
+      }
+      return report(rows, bankVersion, true);
+    }
     if (existing.length) {
       const currentCycles = await tx
         .select({ id: examCycles.id })

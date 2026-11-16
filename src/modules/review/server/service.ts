@@ -49,6 +49,7 @@ export class ReviewService {
         prompt: questions.prompt,
         choices: questions.choices,
         correctChoiceIds: questions.correctChoiceIds,
+        studyGuide: questions.studyGuide,
       })
       .from(questions)
       .where(
@@ -66,7 +67,13 @@ export class ReviewService {
             500,
             'Dữ liệu câu hỏi không hợp lệ.',
           );
-        return { ...row, type: row.type, prompt: row.prompt };
+        const { studyGuide, ...rest } = row;
+        return {
+          ...rest,
+          type: row.type,
+          prompt: row.prompt,
+          ...(studyGuide ? { studyGuide } : {}),
+        };
       }),
     };
   }
